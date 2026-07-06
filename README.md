@@ -4,7 +4,7 @@
 
 ## ドキュメント
 
-- [要件定義書](./docs/観光地巡りアプリ_要件定義書.md)
+- 観光地巡りアプリ_要件定義書.md
 
 ## 技術スタック（暫定）
 
@@ -15,21 +15,3 @@
 - ローカル開発: Docker Compose
 - デプロイ先: AWS
 
-## セットアップ
-
-```bash
-# バックエンド
-cd backend
-python -m venv venv
-source venv/bin/activate  # Windowsは venv\Scripts\activate
-pip install -r requirements.txt
-
-# フロントエンド
-cd frontend
-npm install
-npm run dev
-```
-
-## 開発状況
-
-進行中（1週目：要件定義）
