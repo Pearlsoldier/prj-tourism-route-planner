@@ -1,0 +1,26 @@
+# --- Python (backend) ---
+__pycache__/
+*.pyc
+venv/
+.venv/
+*.env
+.env
+
+# --- Node / フロントエンド ---
+node_modules/
+dist/
+build/
+.vite/
+
+# --- エディタ・OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# --- Docker ---
+*.log
+
+# --- 機密情報(念のため) ---
+*.pem
+secrets/
