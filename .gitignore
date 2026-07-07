@@ -24,3 +24,5 @@ Thumbs.db
 # --- 機密情報(念のため) ---
 *.pem
 secrets/
+
+.docs/
