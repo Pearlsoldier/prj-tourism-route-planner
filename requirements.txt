@@ -1,0 +1,6 @@
+asyncpg==0.30.0
+fastapi==0.139.2
+fonttools==4.61.1
+pydantic==2.13.4
+Quartz==0.0.1.dev0
+Requests==2.34.2
