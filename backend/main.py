@@ -25,7 +25,7 @@ class ChatCompletionRequest(BaseModel):
 
 app = FastAPI()
 
-origins = ["http://localhost:5173"]
+origins = ["http://localhost:5173", "https://prj-tourism-route-planner.vercel.app"]
 
 app.add_middleware(
     CORSMiddleware,
