@@ -1,30 +1,7 @@
 import os
 import requests
 
-from scripts.insert_kyoto_locations import KYOTO_HIGASHIYAMA_LOCATIONS
-
-
-def get_kyoto_locations() -> list[dict]:
-    print("★ get_kyoto_locations が呼ばれました")
-
-    """観光地の一覧を取得する。
-    ユーザーが観光地の周遊プランを求めている場合、この関数を呼び出すこと。
-
-    Returns:
-        観光地のリスト。各要素は location_name, address, latitude, longitude を含む。
-    """
-    return [
-        {
-            "location_name": name,
-            "address": address,
-            "longitude": longitude,
-            "latitude": latitude,
-        }
-        for name, address, longitude, latitude in KYOTO_HIGASHIYAMA_LOCATIONS
-    ]
-
 def search_gourmet(lat: float, lng: float, range: int = 3) -> list[dict]:
-    print("★ search_gourmet が呼ばれました")
     """指定した緯度・経度の周辺の飲食店を検索する。
     ユーザーが食事・グルメの店を探している場合にこの関数を呼び出すこと。
 
@@ -36,6 +13,7 @@ def search_gourmet(lat: float, lng: float, range: int = 3) -> list[dict]:
     Returns:
         飲食店のリスト。各要素は name, genre, budget, access, lat, lng, url を含む。
     """
+    print("★ search_gourmet が呼ばれました")
     api_key = os.environ.get("HOTPEPPER_API_KEY")  # ← .envのキー名と完全一致させる
     url = "http://webservice.recruit.co.jp/hotpepper/gourmet/v1/"
     params = {
@@ -78,7 +56,6 @@ def search_nearby_location(lat: float, lng: float, radius: float, types: list[st
         lng: 検索の中心となる経度
         radius: 検索範囲。100.0m, 200.0m
         types: 検索したい施設カテゴリのリスト。用途に応じて以下から選択する。
-            - 飲食: restaurant, cafe, ramen_restaurant, sushi_restaurant
             - 観光・文化: museum, art_gallery, historical_place, cultural_landmark,
                 monument, tourist_attraction, park, historical_landmark
             - 宗教施設: shinto_shrine（神社）, buddhist_temple（仏閣）, church
@@ -127,3 +104,36 @@ def search_nearby_location(lat: float, lng: float, radius: float, types: list[st
             "opening_hours": place.get("regularOpeningHours", {}).get("weekdayDescriptions"),
         })
     return simplified
+
+def geocode_place(place_name: str) -> dict:
+    """住所や地名から緯度経度を取得する。
+    緯度経度が必要なときに、このAPIを使用すること
+
+    Args:
+        place_name: 必要な施設名、住所のテキストデータ
+
+    Returns:住所データ、緯度（lat）, 経度（lng）の辞書型データ
+
+    """
+    print("★ geocode_place が呼ばれました")
+    api_key = os.environ.get("PLACES_API_KEY")
+    url = "https://maps.googleapis.com/maps/api/geocode/json"
+    result = requests.get(url, params={"address":f"{place_name}", "key": api_key, "language": "ja"})
+    low_place = result.json()
+    status = low_place["status"]
+    if status != "OK":
+        if status == "ZERO_RESULTS":
+            return {"error": "ジオコードは成功したものの結果が返されませんでした。実在しない address が渡された場合に発生することがあります。"}
+        elif status == "OVER_DAILY_LIMIT":
+            return {"error": "設定した使用量の上限を超えている可能性があります。"}
+        elif status == "REQUEST_DENIED":
+            return {"error": "リクエストが拒否されました。"}
+        elif status == "INVALID_REQUEST":
+            return {"error": "クエリ（address、components、latlng）が不足しています。"}
+        elif status == "UNKNOWN_ERROR":
+            return {"error": "サーバーエラーでリクエストが処理できませんでした。再度リクエストすると、成功する可能性があります。"}
+        else:
+            return {"error": f"予期しないエラーが発生しました（{status}）"}
+    address = low_place["results"][0]['formatted_address']
+    location =  low_place["results"][0]['geometry']['location']
+    return {"address": address, "lat": location["lat"], "lng": location["lng"]}

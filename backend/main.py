@@ -6,7 +6,7 @@ import os
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
-from functions.tools import get_kyoto_locations, search_gourmet, search_nearby_location
+from functions.tools import search_gourmet, search_nearby_location, geocode_place
 
 load_dotenv()
 
@@ -57,10 +57,11 @@ async def chat_completions(request: ChatCompletionRequest):
         
         
         config=types.GenerateContentConfig(
-        tools=[get_kyoto_locations, search_gourmet, search_nearby_location],
+        tools=[search_gourmet, search_nearby_location, geocode_place],
         system_instruction=(
             "あなたは観光ナビゲーターです。"
-        "京都・東山エリアの神社仏閣を周遊するルートを、ユーザーの希望をもとに組み立ててください。"
+        "観光地を周遊するルートを、ユーザーの希望をもとに組み立ててください。"
+        "ユーザーから観光地の名称を受け取った時は、geocode_placeを使って、緯度経度を取得し次のツールに渡してください。"
         "ユーザーが食事や飲食店を希望する場合は、search_gourmet を使って周辺の店を検索して提案してください。"
         "ユーザーが観光施設を探したい場合は、search_nearby_locationを使ってユーザーが気になるジャンルのお店や施設を提案してください。"
         )
