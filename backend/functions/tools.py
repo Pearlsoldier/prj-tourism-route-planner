@@ -158,7 +158,7 @@ def get_walking_leg(travel_origin: str, destination: str) -> dict:
     Returns:
         distance_m（距離・メートル）と duration_sec（所要秒数）を含む辞書。
     """
-    print("★ get_walking_leg が呼ばれました。 {travel_origin} → {destination}")
+    print(f"★ get_walking_leg が呼ばれました。 {travel_origin} → {destination}")
     api_key = os.environ.get("GOOGLE_MAPS_API_KEY")
     url = "https://routes.googleapis.com/directions/v2:computeRoutes"
     headers = {
