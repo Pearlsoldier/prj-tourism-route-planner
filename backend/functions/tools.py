@@ -146,11 +146,17 @@ def geocode_place(place_name: str) -> dict:
     location =  low_place["results"][0]['geometry']['location']
     return {"address": address, "lat": location["lat"], "lng": location["lng"]}
 
-def get_walking_leg(a, b) -> dict:
-    '''
-    Goolge Route APIを使って地点Aから地点Bへの移動距離(m)と徒歩での移動時間(s)を取得する関数。
-    '''
-    print("★ get_walking_leg が呼ばれました")
+def get_walking_leg(travel_origin: str, destination: str) -> dict:
+    """2地点間の徒歩での移動距離と所要時間を取得する。
+
+    Args:
+        origin: 出発地の施設名または住所（例：鶴岡八幡宮）
+        destination: 到着地の施設名または住所（例：長谷寺）
+
+    Returns:
+        distance_m（距離・メートル）と duration_sec（所要秒数）を含む辞書。
+    """
+    print("★ get_walking_leg が呼ばれました。 {travel_origin} → {destination}")
     api_key = os.environ.get("GOOGLE_MAPS_API_KEY")
     url = "https://routes.googleapis.com/directions/v2:computeRoutes"
     headers = {
@@ -160,8 +166,8 @@ def get_walking_leg(a, b) -> dict:
     }
 
     body = {
-        "origin": {"address": a},
-        "destination": {"address": b},
+        "origin": {"address": travel_origin},
+        "destination": {"address": destination},
         "travelMode": "WALK",
         "languageCode": "ja",
         "units": "METRIC",
@@ -183,3 +189,5 @@ def get_walking_leg(a, b) -> dict:
     distance = leg["distanceMeters"]
     duration = int(leg["duration"][:-1])
     return {"distance_m": distance, "duration_sec": duration}
+
+
