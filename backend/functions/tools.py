@@ -47,25 +47,27 @@ def search_gourmet(lat: float, lng: float, range: int = 3) -> list[dict]:
 
     return simplified
 
-def search_nearby_location(lat: float, lng: float, radius: float, types: list[str]):
+def search_nearby_location(lat: float, lng: float, types: list[str], radius: float = 1000):
     """指定した緯度・経度の周辺の施設を検索する。
-    ユーザーが食事・グルメの店、施設など座標で求められる施設を探している場合にこの関数を呼び出すこと。
-
-    Args:
-        lat: 検索の中心となる緯度
-        lng: 検索の中心となる経度
-        radius: 検索範囲。100.0m, 200.0m
-        types: 検索したい施設カテゴリのリスト。用途に応じて以下から選択する。
-            - 観光・文化: museum, art_gallery, historical_place, cultural_landmark,
-                monument, tourist_attraction, park, historical_landmark
-            - 宗教施設: shinto_shrine（神社）, buddhist_temple（仏閣）, church
-            - 買い物: shopping_mall, gift_shop, market
-    Returns:
-        観光地のリスト。各要素は name, address, lat, lng, type, description, opening_hoursを含む。
-        
+        ユーザーが観光地や名所を探している場合にこの関数を呼び出すこと。
+        飲食店を探す場合は search_gourmet を使うこと。
+        Args:
+            lat: 検索の中心となる緯度
+            lng: 検索の中心となる経度
+            radius: 検索範囲（メートル）。ユーザーの希望や移動手段に応じて決める。
+                    徒歩で狭く巡る場合は 1000、駅周辺を広く見る場合は 3000、
+                    市内全域なら 5000 程度を目安にする。最大 50000。
+            types: 検索したい施設カテゴリのリスト。用途に応じて以下から選択する。
+                - 観光・文化: museum, art_gallery, historical_place, cultural_landmark,
+                    monument, tourist_attraction, park, historical_landmark
+                - 宗教施設: shinto_shrine（神社）, buddhist_temple（仏閣）, church
+                - 買い物: shopping_mall, gift_shop, market
+        Returns:
+            観光地のリスト。各要素は name, address, lat, lng, type, description, opening_hoursを含む。
     """
     print("★ search_nearby_location が呼ばれました")
-    api_key = os.environ.get("PLACES_API_KEY") 
+    print(f"radius: {radius} mです。")
+    api_key = os.environ.get("GOOGLE_MAPS_API_KEY") 
     url = "https://places.googleapis.com/v1/places:searchNearby"
     headers = {
         "Content-Type": "application/json",
@@ -89,8 +91,13 @@ def search_nearby_location(lat: float, lng: float, radius: float, types: list[st
     }
 
     response = requests.post(url, headers=headers, json=body)
-
-    data = response.json()
+    status = response.status_code
+    if 200 != status:
+        return [{"error": f"エラーコード{status}: 正常に取得できませんでした。"}]
+    
+    data = response.json() 
+    if not data.get("places"):
+        return [{"error": "placesが空です。正常に取得できませんでした。"}]
 
     simplified = []
     for place in data["places"]:
@@ -103,6 +110,7 @@ def search_nearby_location(lat: float, lng: float, radius: float, types: list[st
             "description": place.get("editorialSummary", {}).get("text"),
             "opening_hours": place.get("regularOpeningHours", {}).get("weekdayDescriptions"),
         })
+    print(f"★ 返した候補: {[p['name'] for p in simplified]}")
     return simplified
 
 def geocode_place(place_name: str) -> dict:
@@ -116,7 +124,7 @@ def geocode_place(place_name: str) -> dict:
 
     """
     print("★ geocode_place が呼ばれました")
-    api_key = os.environ.get("PLACES_API_KEY")
+    api_key = os.environ.get("GOOGLE_MAPS_API_KEY")
     url = "https://maps.googleapis.com/maps/api/geocode/json"
     result = requests.get(url, params={"address":f"{place_name}", "key": api_key, "language": "ja"})
     low_place = result.json()
@@ -137,3 +145,41 @@ def geocode_place(place_name: str) -> dict:
     address = low_place["results"][0]['formatted_address']
     location =  low_place["results"][0]['geometry']['location']
     return {"address": address, "lat": location["lat"], "lng": location["lng"]}
+
+def get_walking_leg(a, b) -> dict:
+    '''
+    Goolge Route APIを使って地点Aから地点Bへの移動距離(m)と徒歩での移動時間(s)を取得する関数。
+    '''
+    print("★ get_walking_leg が呼ばれました")
+    api_key = os.environ.get("GOOGLE_MAPS_API_KEY")
+    url = "https://routes.googleapis.com/directions/v2:computeRoutes"
+    headers = {
+    "Content-Type": "application/json",
+    "X-Goog-Api-Key": api_key,    
+    "X-Goog-FieldMask": "routes.duration,routes.distanceMeters",
+    }
+
+    body = {
+        "origin": {"address": a},
+        "destination": {"address": b},
+        "travelMode": "WALK",
+        "languageCode": "ja",
+        "units": "METRIC",
+    }
+
+    response = requests.post(url, headers=headers, json=body)
+    status = response.status_code
+    if 200 != status:
+        return {"error": f"エラーコード{status}: 正常に取得できませんでした。"}
+
+    data = response.json() 
+    if not data.get("routes"):
+        return {"error": "routesが空です。正常に取得できませんでした。"}
+    if not data["routes"][0]:
+        return {"error": "正常に取得できませんでした。"}
+    
+
+    leg = data["routes"][0]
+    distance = leg["distanceMeters"]
+    duration = int(leg["duration"][:-1])
+    return {"distance_m": distance, "duration_sec": duration}

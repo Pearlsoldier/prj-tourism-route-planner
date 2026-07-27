@@ -1,12 +1,3 @@
-import os
-from dotenv import load_dotenv
-import requests
-from functions.tools import search_gourmet, search_nearby_location, geocode_place, get_walking_leg
-
-load_dotenv()
-
-api_key = os.environ.get("GOOGLE_MAPS_API_KEY")
-
 from dataclasses import dataclass, field
 
 @dataclass
@@ -25,12 +16,3 @@ class Guidebook:
 
     def is_ready(self) -> bool:
         return not self.missing_fields()
-    
-plan = Guidebook()
-
-plan.origin = geocode_place("鎌倉駅")
-print(plan)
-print(plan.missing_fields())
-
-
-
