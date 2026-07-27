@@ -124,12 +124,14 @@ def geocode_place(place_name: str) -> dict:
 
     """
     print("★ geocode_place が呼ばれました")
+    print(f"★ geocode_place: '{place_name}'") 
     api_key = os.environ.get("GOOGLE_MAPS_API_KEY")
     url = "https://maps.googleapis.com/maps/api/geocode/json"
     result = requests.get(url, params={"address":f"{place_name}", "key": api_key, "language": "ja"})
     low_place = result.json()
     status = low_place["status"]
     if status != "OK":
+        print(f"★ geocode_place 失敗: {status}")
         if status == "ZERO_RESULTS":
             return {"error": "ジオコードは成功したものの結果が返されませんでした。実在しない address が渡された場合に発生することがあります。"}
         elif status == "OVER_DAILY_LIMIT":
