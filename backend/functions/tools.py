@@ -1,6 +1,8 @@
 import os
 import requests
 
+print("[import] tools を読み込み")
+
 def search_gourmet(lat: float, lng: float, range: int = 3) -> list[dict]:
     """指定した緯度・経度の周辺の飲食店を検索する。
     ユーザーが食事・グルメの店を探している場合にこの関数を呼び出すこと。
@@ -47,7 +49,7 @@ def search_gourmet(lat: float, lng: float, range: int = 3) -> list[dict]:
 
     return simplified
 
-def search_nearby_location(lat: float, lng: float, types: list[str], radius: float = 1000):
+def search_nearby_location(lat: float, lng: float, types: list[str], radius: float = 1000.0):
     """指定した緯度・経度の周辺の施設を検索する。
         ユーザーが観光地や名所を探している場合にこの関数を呼び出すこと。
         飲食店を探す場合は search_gourmet を使うこと。
@@ -152,11 +154,15 @@ def get_walking_leg(travel_origin: str, destination: str) -> dict:
     """2地点間の徒歩での移動距離と所要時間を取得する。
 
     Args:
-        origin: 出発地の施設名または住所（例：鶴岡八幡宮）
+        travel_origin: 出発地の施設名または住所（例：鶴岡八幡宮）
         destination: 到着地の施設名または住所（例：長谷寺）
 
     Returns:
-        distance_m（距離・メートル）と duration_sec（所要秒数）を含む辞書。
+        travel_origin: 出発地の施設名または住所（例：鶴岡八幡宮）
+        destination: 到着地の施設名または住所（例：長谷寺）
+        distance_m: 距離・メートル
+        duration_sec: （所要秒数）
+        を含む辞書。
     """
     print(f"★ get_walking_leg が呼ばれました。 {travel_origin} → {destination}")
     api_key = os.environ.get("GOOGLE_MAPS_API_KEY")
@@ -190,6 +196,12 @@ def get_walking_leg(travel_origin: str, destination: str) -> dict:
     leg = data["routes"][0]
     distance = leg["distanceMeters"]
     duration = int(leg["duration"][:-1])
-    return {"distance_m": distance, "duration_sec": duration}
+    return {
+        "travel_origin": travel_origin,
+        "destination": destination,
+        "distance_m": distance,
+        "duration_sec": duration,
+    }
+
 
 

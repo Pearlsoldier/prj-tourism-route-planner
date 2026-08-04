@@ -1,11 +1,12 @@
 from dataclasses import dataclass, field
+print("[import] models.guidebook を読み込み")
 
 @dataclass
 class Guidebook:
     # originは出発地
     origin: dict | None = None
     # candidatesは候補地
-    candidates: list[dict] = field(default_factory=list)
+    # candidates: list[dict] = field(default_factory=list)
     # 入ってきた順序が巡り順を表す
     selected: list[str] = field(default_factory=list)
     # legsは区間
