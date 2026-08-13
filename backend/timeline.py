@@ -75,3 +75,41 @@ def format_timeline_markdown(timeline: list[dict]) -> str:
         m = f"{row['duration_min']} 分" if row["duration_min"] is not None else "—"
         lines.append(f"| {row['time']} | {row['place']} | {d} | {m} |")
     return "\n".join(lines)
+
+def format_summary_markdown(summary: dict) -> str:
+    total = summary["total_walk_min"] + summary["total_stay_min"]
+    hours, minutes = divmod(total, 60)
+    return (
+        f"\n徒歩 {summary['total_walk_min']} 分 / "
+        f"滞在 {summary['total_stay_min']} 分 / "
+        f"計 {hours} 時間 {minutes} 分（{summary['total_distance_m']} m）。"
+        f"終了見込み {summary['end_time']}"
+    )
+
+def summarize_plan(timeline: list[dict], selected: list[dict]) -> dict:
+    """タイムラインと巡り順から、合計時間と終了見込みを計算する。
+
+    Args:
+        timeline: build_timeline の返り値。
+        selected: 巡る地点のリスト。stay_minutes の合計に使う。
+
+    Returns:
+        total_walk_min / total_stay_min / total_distance_m / end_time を含む辞書。
+        end_time は最終地点の到着時刻に、その地点の滞在時間を足した時刻。
+    """
+    total_walk_min = sum(row["duration_min"] or 0 for row in timeline)
+    total_distance_m = sum(row["distance_m"] or 0 for row in timeline)
+    total_stay_min = sum(
+        place.get("stay_minutes") or 0 for place in selected
+    )
+
+    last_stay = selected[-1].get("stay_minutes") or 0
+    hour, minute = map(int, timeline[-1]["time"].split(":"))
+    end = datetime(2026, 1, 1, hour, minute) + timedelta(minutes=last_stay)
+
+    return {
+        "total_walk_min": total_walk_min,
+        "total_stay_min": total_stay_min,
+        "total_distance_m": total_distance_m,
+        "end_time": end.strftime("%H:%M"),
+    }

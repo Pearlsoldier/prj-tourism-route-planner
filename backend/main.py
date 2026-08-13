@@ -10,7 +10,7 @@ from models.guidebook import Guidebook
 import hashlib
 from functions.wraped_tools import record_to_guidebook, make_select_places, make_set_start_time
 import functions.tools
-from timeline import build_timeline, format_timeline_markdown
+from timeline import build_timeline, format_timeline_markdown, summarize_plan, format_summary_markdown
 from prompts import build_system_instruction
 
 load_dotenv()
@@ -100,7 +100,9 @@ async def chat_completions(request: ChatCompletionRequest):
 
     text = response.text
     if plan.is_ready():
-        timeline = build_timeline(plan.selected, plan.legs)
+        timeline = build_timeline(plan.selected, plan.legs, plan.start_time or "09:00")
+        summary = summarize_plan(timeline, plan.selected)
         text += "\n\n" + format_timeline_markdown(timeline)
+        text += "\n" + format_summary_markdown(summary)
 
     return {"choices": [{"message": {"content": text}}]}
