@@ -8,7 +8,7 @@ from google import genai
 from google.genai import types
 from models.guidebook import Guidebook
 import hashlib
-from functions.wraped_tools import record_to_guidebook, make_select_places
+from functions.wraped_tools import record_to_guidebook, make_select_places, make_set_start_time
 import functions.tools
 from timeline import build_timeline, format_timeline_markdown
 from prompts import build_system_instruction
@@ -64,6 +64,7 @@ async def chat_completions(request: ChatCompletionRequest):
     recorder_legs = record_to_guidebook(plan, "legs", "append")
     get_walking_leg_w = recorder_legs(functions.tools.get_walking_leg)
     select_places = make_select_places(plan)
+    set_start_time = make_set_start_time(plan)
     import inspect
     print(inspect.signature(geocode_place_w))
     print(geocode_place_w.__doc__)
@@ -88,13 +89,13 @@ async def chat_completions(request: ChatCompletionRequest):
                 geocode_place_w,
                 get_walking_leg_w,
                 select_places,
+                set_start_time,
                 functions.tools.search_gourmet,
                 functions.tools.search_nearby_location,
-                ],
-            system_instruction=(build_system_instruction(plan)
+            ],
+            system_instruction=build_system_instruction(plan),
             ),
-        ),
-    )
+        )
     print(plan, plan.missing_fields())
 
     text = response.text

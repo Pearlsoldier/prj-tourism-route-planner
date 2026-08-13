@@ -62,3 +62,19 @@ def make_select_places(plan: Guidebook):
         plan.selected = places
         return {"selected": places}
     return select_places
+
+def make_set_start_time(plan: Guidebook):
+    def set_start_time(start_time: str) -> dict:
+        """ユーザーが観光の開始時刻を指定したら、この関数を呼び出す。
+
+    Args:
+        start_time: 観光を始める時刻。"HH:MM" 形式の24時間表記で指定する。
+            （例: "09:00", "13:30"）
+
+    Returns:
+        登録された開始時刻を含む辞書。
+    """
+        print(f"★ set_start_time が呼ばれました。 {start_time}")
+        plan.start_time = start_time
+        return {"start_time": start_time}
+    return set_start_time

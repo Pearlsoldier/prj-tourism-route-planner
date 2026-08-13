@@ -3,21 +3,23 @@ from datetime import datetime, timedelta
 DEFAULT_STAY_MINUTES = 60  # stay_minutes が指定されなかった場合の既定値
 
 
-def build_timeline(selected: list[dict], legs: list[dict], start_hour: int = 9) -> list[dict]:
+def build_timeline(selected: list[dict], legs: list[dict], start_time: str = "09:00") -> list[dict]:
     """巡り順と区間データから、時刻付きのタイムラインを組み立てる。
 
     Args:
+    
         selected: 巡る地点のリスト。先頭が出発地。
             各要素は name（地点名）と stay_minutes（滞在時間・分）を持つ辞書。
         legs: 区間データのリスト。travel_origin / destination / distance_m / duration_min を含む。
-        start_hour: 出発時刻（時）。
+        start_time: 観光の開始時刻。"HH:MM" 形式（例: "09:00"）。
 
     Returns:
         各地点の情報を持つ辞書のリスト。
         time / place / distance_m / duration_min を含む。
         distance_m と duration_min は「次の地点までの移動」を表し、最後の地点は None。
     """
-    now = datetime(2026, 1, 1, start_hour, 0)
+    hour, minute = map(int, start_time.split(":"))
+    now = datetime(2026, 1, 1, hour, minute)
     timeline = []
 
     for i in range(len(selected) - 1):
