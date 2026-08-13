@@ -1,70 +1,207 @@
+import os
+import requests
+import math 
 
-from datetime import datetime, timedelta
+print("[import] tools を読み込み")
 
-STAY_MINUTES = 60  # 各地点の滞在時間（分）
-
-
-def build_timeline(selected: list[str], legs: list[dict], start_hour: int = 9) -> list[dict]:
-    """巡り順と区間データから、時刻付きのタイムラインを組み立てる。
+def search_gourmet(lat: float, lng: float, range: int = 3) -> list[dict]:
+    """指定した緯度・経度の周辺の飲食店を検索する。
+    ユーザーが食事・グルメの店を探している場合にこの関数を呼び出すこと。
 
     Args:
-        selected: 巡る地点の名称リスト。先頭が出発地。
-        legs: 区間データのリスト。travel_origin / destination / distance_m / duration_min を含む。
-        start_hour: 出発時刻（時）。
+        lat: 検索の中心となる緯度
+        lng: 検索の中心となる経度
+        range: 検索範囲。1:300m 2:500m 3:1000m 4:2000m 5:3000m
 
     Returns:
-        各地点の情報を持つ辞書のリスト。
-        time / place / distance_m / duration_min を含む。
-        distance_m と duration_min は「次の地点までの移動」を表し、最後の地点は None。
+        飲食店のリスト。各要素は name, genre, budget, access, lat, lng, url を含む。
     """
-    now = datetime(2026, 1, 1, start_hour, 0)
-    timeline = []
+    print("★ search_gourmet が呼ばれました")
+    api_key = os.environ.get("HOTPEPPER_API_KEY")  # ← .envのキー名と完全一致させる
+    url = "http://webservice.recruit.co.jp/hotpepper/gourmet/v1/"
+    params = {
+        "key": api_key,
+        "lat": lat,
+        "lng": lng,
+        "range": range,
+        "order": 4,
+        "count": 3,
+        "format": "json",
+    }
 
-    for i in range(len(selected) - 1):
-        start = selected[i]
-        end = selected[i + 1]
+    response = requests.get(url, params=params)
 
-        found = None
-        for leg in legs:
-            if leg["travel_origin"] == start and leg["destination"] == end:
-                found = leg
-                break
+    data = response.json()
 
-        if found is None:
-            print(f"★ build_timeline: 区間が見つかりません {start} → {end}")
-            timeline.append({
-                "time": now.strftime("%H:%M"),
-                "place": start,
-                "distance_m": None,
-                "duration_min": None,
-            })
-            now += timedelta(minutes=STAY_MINUTES)
-            continue
+    shops = data["results"]["shop"]
+    simplified = []
+    for shop in shops:
+        simplified.append(
+            {
+                "name": shop["name"],
+                "genre": shop["genre"]["name"],  # ジャンル名
+                "budget": shop["budget"]["name"],
+                "access": shop["access"],
+                "lat": shop["lat"],
+                "lng": shop["lng"],
+                "url": shop["urls"]["pc"],
+            }
+        )
 
-        timeline.append({
-            "time": now.strftime("%H:%M"),
-            "place": start,
-            "distance_m": found["distance_m"],
-            "duration_min": found["duration_min"],
+    return simplified
+
+def search_nearby_location(lat: float, lng: float, types: list[str], radius: float = 1000.0):
+    """指定した緯度・経度の周辺の施設を検索する。
+        ユーザーが観光地や名所を探している場合にこの関数を呼び出すこと。
+        飲食店を探す場合は search_gourmet を使うこと。
+        Args:
+            lat: 検索の中心となる緯度
+            lng: 検索の中心となる経度
+            radius: 検索範囲（メートル）。ユーザーの希望や移動手段に応じて決める。
+                    徒歩で狭く巡る場合は 1000、駅周辺を広く見る場合は 3000、
+                    市内全域なら 5000 程度を目安にする。最大 50000。
+            types: 検索したい施設カテゴリのリスト。用途に応じて以下から選択する。
+                - 観光・文化: museum, art_gallery, historical_place, cultural_landmark,
+                    monument, tourist_attraction, park, historical_landmark
+                - 宗教施設: shinto_shrine（神社）, buddhist_temple（仏閣）, church
+                - 買い物: shopping_mall, gift_shop, market
+        Returns:
+            観光地のリスト。各要素は name, address, lat, lng, type, description, opening_hoursを含む。
+    """
+    print("★ search_nearby_location が呼ばれました")
+    print(f"radius: {radius} mです。")
+    api_key = os.environ.get("GOOGLE_MAPS_API_KEY") 
+    url = "https://places.googleapis.com/v1/places:searchNearby"
+    headers = {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": api_key,
+        "X-Goog-FieldMask": "places.displayName,places.formattedAddress,places.location,places.primaryTypeDisplayName,places.editorialSummary,places.regularOpeningHours.weekdayDescriptions", 
+        }
+
+    body = {
+        "includedTypes": types,
+        "maxResultCount": 5,
+        "languageCode": "ja", 
+        "locationRestriction": {
+            "circle": {
+                "center": {
+                    "latitude": lat,
+                    "longitude": lng
+                },
+                "radius": radius
+            }
+        }
+    }
+
+    response = requests.post(url, headers=headers, json=body)
+    status = response.status_code
+    if 200 != status:
+        return [{"error": f"エラーコード{status}: 正常に取得できませんでした。"}]
+    
+    data = response.json() 
+    if not data.get("places"):
+        return [{"error": "placesが空です。正常に取得できませんでした。"}]
+
+    simplified = []
+    for place in data["places"]:
+        simplified.append({
+            "name": place["displayName"]["text"],
+            "address": place["formattedAddress"],
+            "lat": place["location"]["latitude"],
+            "lng": place["location"]["longitude"],
+            "type": place.get("primaryTypeDisplayName", {}).get("text"),
+            "description": place.get("editorialSummary", {}).get("text"),
+            "opening_hours": place.get("regularOpeningHours", {}).get("weekdayDescriptions"),
         })
+    print(f"★ 返した候補: {[p['name'] for p in simplified]}")
+    return simplified
 
-        now += timedelta(minutes=found["duration_min"] + STAY_MINUTES)
+def geocode_place(place_name: str) -> dict:
+    """住所や地名から緯度経度を取得する。
+    緯度経度が必要なときに、このAPIを使用すること
 
-    # 最後の地点はループに入らないので、ここで追加する
-    timeline.append({
-        "time": now.strftime("%H:%M"),
-        "place": selected[-1],
-        "distance_m": None,
-        "duration_min": None,
-    })
+    Args:
+        place_name: 必要な施設名、住所のテキストデータ
 
-    return timeline
+    Returns:住所データ、緯度（lat）, 経度（lng）の辞書型データ
+
+    """
+    print("★ geocode_place が呼ばれました")
+    print(f"★ geocode_place: '{place_name}'") 
+    api_key = os.environ.get("GOOGLE_MAPS_API_KEY")
+    url = "https://maps.googleapis.com/maps/api/geocode/json"
+    result = requests.get(url, params={"address":f"{place_name}", "key": api_key, "language": "ja"})
+    low_place = result.json()
+    status = low_place["status"]
+    if status != "OK":
+        print(f"★ geocode_place 失敗: {status}")
+        if status == "ZERO_RESULTS":
+            return {"error": "ジオコードは成功したものの結果が返されませんでした。実在しない address が渡された場合に発生することがあります。"}
+        elif status == "OVER_DAILY_LIMIT":
+            return {"error": "設定した使用量の上限を超えている可能性があります。"}
+        elif status == "REQUEST_DENIED":
+            return {"error": "リクエストが拒否されました。"}
+        elif status == "INVALID_REQUEST":
+            return {"error": "クエリ（address、components、latlng）が不足しています。"}
+        elif status == "UNKNOWN_ERROR":
+            return {"error": "サーバーエラーでリクエストが処理できませんでした。再度リクエストすると、成功する可能性があります。"}
+        else:
+            return {"error": f"予期しないエラーが発生しました（{status}）"}
+    address = low_place["results"][0]['formatted_address']
+    location =  low_place["results"][0]['geometry']['location']
+    return {"address": address, "lat": location["lat"], "lng": location["lng"]}
+
+def get_walking_leg(travel_origin: str, destination: str) -> dict:
+    """2地点間の徒歩での移動距離と所要時間を取得する。
+
+    Args:
+        travel_origin: 出発地の施設名または住所（例：鶴岡八幡宮）
+        destination: 到着地の施設名または住所（例：長谷寺）
+
+    Returns:
+        travel_origin, destination, distance_m（距離・メートル）、
+        duration_min（所要時間・分。秒から切り上げ）を含む辞書。
+    """
+    print(f"★ get_walking_leg が呼ばれました。 {travel_origin} → {destination}")
+    api_key = os.environ.get("GOOGLE_MAPS_API_KEY")
+    url = "https://routes.googleapis.com/directions/v2:computeRoutes"
+    headers = {
+    "Content-Type": "application/json",
+    "X-Goog-Api-Key": api_key,    
+    "X-Goog-FieldMask": "routes.duration,routes.distanceMeters",
+    }
+
+    body = {
+        "origin": {"address": travel_origin},
+        "destination": {"address": destination},
+        "travelMode": "WALK",
+        "languageCode": "ja",
+        "units": "METRIC",
+    }
+
+    response = requests.post(url, headers=headers, json=body)
+    status = response.status_code
+    if 200 != status:
+        return {"error": f"エラーコード{status}: 正常に取得できませんでした。"}
+
+    data = response.json() 
+    if not data.get("routes"):
+        return {"error": "routesが空です。正常に取得できませんでした。"}
+    if not data["routes"][0]:
+        return {"error": "正常に取得できませんでした。"}
+    
+
+    leg = data["routes"][0]
+    distance = leg["distanceMeters"]
+    duration_sec = int(leg["duration"][:-1])
+    duration_min = math.ceil(duration_sec / 60)
+    return {
+        "travel_origin": travel_origin,
+        "destination": destination,
+        "distance_m": distance,
+        "duration_min": duration_min,
+    }
 
 
-def format_timeline_markdown(timeline: list[dict]) -> str:
-    lines = ["| 時刻 | 場所 | 次までの距離 | 徒歩 |", "|---|---|---|---|"]
-    for row in timeline:
-        d = f"{row['distance_m']} m" if row["distance_m"] is not None else "—"
-        m = f"{row['duration_min']} 分" if row["duration_min"] is not None else "—"
-        lines.append(f"| {row['time']} | {row['place']} | {d} | {m} |")
-    return "\n".join(lines)
+
+

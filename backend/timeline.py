@@ -1,13 +1,14 @@
 from datetime import datetime, timedelta
 
-STAY_MINUTES = 60  # 各地点の滞在時間（分）
+DEFAULT_STAY_MINUTES = 60  # stay_minutes が指定されなかった場合の既定値
 
 
-def build_timeline(selected: list[str], legs: list[dict], start_hour: int = 9) -> list[dict]:
+def build_timeline(selected: list[dict], legs: list[dict], start_hour: int = 9) -> list[dict]:
     """巡り順と区間データから、時刻付きのタイムラインを組み立てる。
 
     Args:
-        selected: 巡る地点の名称リスト。先頭が出発地。
+        selected: 巡る地点のリスト。先頭が出発地。
+            各要素は name（地点名）と stay_minutes（滞在時間・分）を持つ辞書。
         legs: 区間データのリスト。travel_origin / destination / distance_m / duration_min を含む。
         start_hour: 出発時刻（時）。
 
@@ -20,8 +21,13 @@ def build_timeline(selected: list[str], legs: list[dict], start_hour: int = 9) -
     timeline = []
 
     for i in range(len(selected) - 1):
-        start = selected[i]
-        end = selected[i + 1]
+        start = selected[i]["name"]
+        end = selected[i + 1]["name"]
+
+        stay = selected[i].get("stay_minutes")
+        if stay is None:
+            print(f"★ build_timeline: stay_minutes がありません {start}")
+            stay = DEFAULT_STAY_MINUTES
 
         found = None
         for leg in legs:
@@ -37,7 +43,7 @@ def build_timeline(selected: list[str], legs: list[dict], start_hour: int = 9) -
                 "distance_m": None,
                 "duration_min": None,
             })
-            now += timedelta(minutes=STAY_MINUTES)
+            now += timedelta(minutes=stay)
             continue
 
         timeline.append({
@@ -47,17 +53,18 @@ def build_timeline(selected: list[str], legs: list[dict], start_hour: int = 9) -
             "duration_min": found["duration_min"],
         })
 
-        now += timedelta(minutes=found["duration_min"] + STAY_MINUTES)
+        now += timedelta(minutes=found["duration_min"] + stay)
 
     # 最後の地点はループに入らないので、ここで追加する
     timeline.append({
         "time": now.strftime("%H:%M"),
-        "place": selected[-1],
+        "place": selected[-1]["name"],
         "distance_m": None,
         "duration_min": None,
     })
 
     return timeline
+
 
 def format_timeline_markdown(timeline: list[dict]) -> str:
     lines = ["| 時刻 | 場所 | 次までの距離 | 徒歩 |", "|---|---|---|---|"]

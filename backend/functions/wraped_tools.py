@@ -38,20 +38,27 @@ def record_to_guidebook(plan: Guidebook, field: str, mode: str = "once"):
 
 
 def make_select_places(plan: Guidebook):
-    def select_places(names: list[str]) -> dict:
+    def select_places(places: list[dict]) -> dict:
         """ユーザーが巡る観光地と順番を確定したら、この関数を呼び出す。
 
     出発地を先頭に含め、ユーザーが挙げた順にリストへ並べること。
     この順序がそのまま巡り順として扱われる。
 
     Args:
-        names: 巡る地点の名称リスト。先頭が出発地。
-            （例: ["鎌倉駅", "小町通", "鶴岡八幡宮"]）
+        places: 巡る地点のリスト。先頭が出発地。
+            各要素は name と stay_minutes の2つのキーを持つ辞書にすること。
+            name: 地点の名称。search_nearby_location が返した name を
+                そのまま使うこと。住所に変えたり省略したりしない。
+            stay_minutes: その地点での滞在時間（分）。整数で指定する。
+                出発地の stay_minutes は必ず 0 にすること。
+            （例: [{"name": "鎌倉駅", "stay_minutes": 0},
+                   {"name": "鶴岡八幡宮", "stay_minutes": 45},
+                   {"name": "小町通り", "stay_minutes": 60}]）
 
     Returns:
         登録された巡り順のリストを含む辞書。
     """
-        print(f"★ select_places が呼ばれました。 {names}")
-        plan.selected = names
-        return {"selected": names}
+        print(f"★ select_places が呼ばれました。 {places}")
+        plan.selected = places
+        return {"selected": places}
     return select_places

@@ -8,7 +8,8 @@ class Guidebook:
     # candidatesは候補地
     # candidates: list[dict] = field(default_factory=list)
     # 入ってきた順序が巡り順を表す
-    selected: list[str] = field(default_factory=list)
+    selected: list[dict] = field(default_factory=list)
+    
     # legsは区間
     legs: list[dict] = field(default_factory=list)
 
