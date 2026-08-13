@@ -58,3 +58,11 @@ def build_timeline(selected: list[str], legs: list[dict], start_hour: int = 9) -
     })
 
     return timeline
+
+def format_timeline_markdown(timeline: list[dict]) -> str:
+    lines = ["| 時刻 | 場所 | 次までの距離 | 徒歩 |", "|---|---|---|---|"]
+    for row in timeline:
+        d = f"{row['distance_m']} m" if row["distance_m"] is not None else "—"
+        m = f"{round(row['duration_sec'] / 60)} 分" if row["duration_sec"] is not None else "—"
+        lines.append(f"| {row['time']} | {row['place']} | {d} | {m} |")
+    return "\n".join(lines)

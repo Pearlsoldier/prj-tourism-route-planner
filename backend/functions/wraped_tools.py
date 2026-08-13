@@ -20,7 +20,8 @@ def record_to_guidebook(plan: Guidebook, field: str, mode: str = "once"):
             if "error" in result:
                 print(f"   [3層目] スキップ（field={field} / エラー）")
             elif mode == "append":
-                getattr(plan, field).append(result)
+                if result not in getattr(plan, field):
+                    getattr(plan, field).append(result)
                 print(f"   [3層目] 追記（field={field} / 件数={len(getattr(plan, field))}）")
             else:
                 if getattr(plan, field) is None:

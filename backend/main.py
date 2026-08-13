@@ -10,7 +10,8 @@ from models.guidebook import Guidebook
 import hashlib
 from functions.wraped_tools import record_to_guidebook, make_select_places
 import functions.tools
-from timeline import build_timeline
+from timeline import build_timeline, format_timeline_markdown
+from prompts import build_system_instruction
 
 load_dotenv()
 
@@ -90,32 +91,15 @@ async def chat_completions(request: ChatCompletionRequest):
                 functions.tools.search_gourmet,
                 functions.tools.search_nearby_location,
                 ],
-            system_instruction=(
-                "あなたは観光ナビゲーターです。"
-                "観光地を周遊するルートを、ユーザーの希望をもとに組み立ててください。ユーザーの移動は徒歩です。\n"
-                "\n"
-                "【厳守】\n"
-                "地名・施設名が会話に出たら、必ず geocode_place を呼んで座標を取得すること。\n"
-                "あなたの知識にある座標を使ってはいけない。\n"
-                "しおりに無い施設名を、あなたの知識から挙げてはいけない。\n"
-                "巡る場所と順番が決まったら、必ず select_places を呼ぶこと。\n"
-                "select_places を呼ぶ前に get_walking_leg を呼んではいけない。\n"
-                "select_places を呼んだ直後に、隣り合う2地点ごとに get_walking_leg を呼ぶこと。\n"
-                "\n"
-                "ユーザーが食事や飲食店を希望する場合は search_gourmet を、"
-                "観光施設を探す場合は search_nearby_location を呼ぶこと。"
-                "区間の距離や移動時間は get_walking_leg で求めること。\n"
-                "\n"
-                "不足している欄の先頭を埋めるために、ツールを呼ぶかユーザーに質問してください。"
+            system_instruction=(build_system_instruction(plan)
             ),
         ),
     )
     print(plan, plan.missing_fields())
 
-    if plan.selected and plan.legs:
+    text = response.text
+    if plan.is_ready():
         timeline = build_timeline(plan.selected, plan.legs)
-        print(timeline)
+        text += "\n\n" + format_timeline_markdown(timeline)
 
-    print(plan, plan.missing_fields())
-    return {"choices": [{"message": {"content": response.text}}]}
-
+    return {"choices": [{"message": {"content": text}}]}
