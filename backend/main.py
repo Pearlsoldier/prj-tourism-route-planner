@@ -8,7 +8,7 @@ from google import genai
 from google.genai import types
 from models.guidebook import Guidebook
 import hashlib
-from functions.wraped_tools import record_to_guidebook, make_select_places, make_set_start_time
+from functions.wraped_tools import record_to_guidebook, make_select_places, make_set_start_time, make_reorder_places
 import functions.tools
 from timeline import build_timeline, format_timeline_markdown, summarize_plan, format_summary_markdown
 from prompts import build_system_instruction
@@ -61,6 +61,7 @@ async def chat_completions(request: ChatCompletionRequest):
     plan = sessions.setdefault(session_key, Guidebook())
     recorder_origin = record_to_guidebook(plan, "origin")
     geocode_place_w = recorder_origin(functions.tools.geocode_place)
+    reorder_places_w = make_reorder_places(plan)
     recorder_legs = record_to_guidebook(plan, "legs", "append")
     get_walking_leg_w = recorder_legs(functions.tools.get_walking_leg)
     select_places = make_select_places(plan)
@@ -88,6 +89,7 @@ async def chat_completions(request: ChatCompletionRequest):
             tools=[
                 geocode_place_w,
                 get_walking_leg_w,
+                reorder_places_w,
                 select_places,
                 set_start_time,
                 functions.tools.search_gourmet,
@@ -99,6 +101,16 @@ async def chat_completions(request: ChatCompletionRequest):
     print(plan, plan.missing_fields())
 
     text = response.text
+
+    # 並べ替え等で legs が空になっていたら、selected から組み直す
+    if len(plan.selected) >= 2 and not plan.legs:
+        print("★ legs を再計算します")
+        for i in range(len(plan.selected) - 1):
+            get_walking_leg_w(
+                plan.selected[i]["name"],
+                plan.selected[i + 1]["name"],
+            )
+
     if plan.is_ready():
         timeline = build_timeline(plan.selected, plan.legs, plan.start_time or "09:00")
         summary = summarize_plan(timeline, plan.selected)

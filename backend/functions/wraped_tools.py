@@ -78,3 +78,62 @@ def make_set_start_time(plan: Guidebook):
         plan.start_time = start_time
         return {"start_time": start_time}
     return set_start_time
+
+def make_reorder_places(plan: Guidebook):
+    def reorder_places(names: list[str]) -> dict:
+        """ユーザーが巡る順番の変更を指示したら、この関数を呼び出す。
+
+        出発地は先頭に固定されており、並べ替えの対象外。
+        names に出発地を含めてはいけない。
+
+        Args:
+            names: 変更後の巡り順に並べた観光地の名前のリスト。
+                出発地を除いた観光地を「すべて」含めること。
+                1ヶ所だけ動かす場合も、並べ替え後の全体を渡すこと。
+                名前はしおりに記録されているものと完全に一致させること。
+
+        Returns:
+            変更後の巡り順。失敗した場合は error を含む辞書。
+        """
+        print(f"★ reorder_places が呼ばれました。 {names}")
+
+        # 1. 並べ替えられる状態か（起点 + 2ヶ所以上）
+        if len(plan.selected) < 3:
+            return {"error": "並べ替えの対象となる観光地が2ヶ所ありません。"}
+
+        origin = plan.selected[0]
+        others = plan.selected[1:]
+
+        # 2. 起点が混ざっていたら黙って除く
+        names = [n for n in names if n != origin["name"]]
+
+        # 3. 検証（plan にはまだ触らない）
+        by_name = {place["name"]: place for place in others}
+
+        unknown = [n for n in names if n not in by_name]
+        if unknown:
+            return {
+                "error": f"しおりに無い観光地が含まれています: {unknown}",
+                "指定できる観光地": list(by_name),
+            }
+
+        if len(names) != len(set(names)):
+            return {"error": "同じ観光地が複数回指定されています。"}
+
+        if len(names) != len(others):
+            return {
+                "error": (
+                    f"観光地は{len(others)}ヶ所ありますが、{len(names)}ヶ所しか"
+                    f"指定されていません。並べ替え後の全体を渡してください。"
+                ),
+                "指定できる観光地": list(by_name),
+            }
+
+        # 4. 反映
+        plan.selected = [origin] + [by_name[n] for n in names]
+        plan.legs = []
+
+        print(f"★ 巡り順を変更しました。 {[p['name'] for p in plan.selected]}")
+        return {"selected": [p["name"] for p in plan.selected]}
+
+    return reorder_places
