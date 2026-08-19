@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List
@@ -17,7 +17,10 @@ load_dotenv()
 
 api_key = os.environ.get("GEMINI_API_KEY")
 client = genai.Client(api_key=api_key)
-
+ACCESS_KEYS = {
+    os.environ["ACCESS_KEY_OWNER"]: "owner",
+    os.environ["ACCESS_KEY_REVIEWER"]: "reviewer",
+}
 
 print("[main] 開始")
 
@@ -30,6 +33,26 @@ class Message(BaseModel):
 class ChatCompletionRequest(BaseModel):
     messages: List[Message]
 
+
+def verify_token(authorization: str | None = Header(None)) -> str:
+    """Authorization ヘッダーのアクセスキーを照合し、持ち主の名前を返す。"""
+    if authorization is None:
+        print("★ 認証失敗: Authorization ヘッダーなし")
+        raise HTTPException(status_code=401, detail="認証に失敗しました")
+
+    if not authorization.startswith("Bearer "):
+        print("★ 認証失敗: 形式が不正")
+        raise HTTPException(status_code=401, detail="認証に失敗しました")
+
+    token = authorization[len("Bearer "):]
+    who = ACCESS_KEYS.get(token)
+
+    if who is None:
+        print("★ 認証失敗: 未登録のアクセスキー")
+        raise HTTPException(status_code=401, detail="認証に失敗しました")
+
+    print(f"★ 認証OK: {who}")
+    return who
 
 app = FastAPI()
 
@@ -50,7 +73,7 @@ async def hello():
 
 
 @app.post("/v1/chat/completions")
-async def chat_completions(request: ChatCompletionRequest):
+async def chat_completions(request: ChatCompletionRequest, who: str = Depends(verify_token)):
     # user が 0 件のリクエストは想定していない（IndexError で落ちる）
     user_messages = [m.content for m in request.messages if m.role == "user"]
     # 第一声が同じ会話は同じしおりを共有する（実測済み）
