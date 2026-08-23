@@ -4,56 +4,10 @@ import math
 
 print("[import] tools を読み込み")
 
-def search_gourmet(lat: float, lng: float, range: int = 3) -> list[dict]:
-    """指定した緯度・経度の周辺の飲食店を検索する。
-    ユーザーが食事・グルメの店を探している場合にこの関数を呼び出すこと。
-
-    Args:
-        lat: 検索の中心となる緯度
-        lng: 検索の中心となる経度
-        range: 検索範囲。1:300m 2:500m 3:1000m 4:2000m 5:3000m
-
-    Returns:
-        飲食店のリスト。各要素は name, genre, budget, access, lat, lng, url を含む。
-    """
-    print("★ search_gourmet が呼ばれました")
-    api_key = os.environ.get("HOTPEPPER_API_KEY")  # ← .envのキー名と完全一致させる
-    url = "http://webservice.recruit.co.jp/hotpepper/gourmet/v1/"
-    params = {
-        "key": api_key,
-        "lat": lat,
-        "lng": lng,
-        "range": range,
-        "order": 4,
-        "count": 3,
-        "format": "json",
-    }
-
-    response = requests.get(url, params=params)
-
-    data = response.json()
-
-    shops = data["results"]["shop"]
-    simplified = []
-    for shop in shops:
-        simplified.append(
-            {
-                "name": shop["name"],
-                "genre": shop["genre"]["name"],  # ジャンル名
-                "budget": shop["budget"]["name"],
-                "access": shop["access"],
-                "lat": shop["lat"],
-                "lng": shop["lng"],
-                "url": shop["urls"]["pc"],
-            }
-        )
-
-    return simplified
 
 def search_nearby_location(lat: float, lng: float, types: list[str], radius: float = 1000.0):
     """指定した緯度・経度の周辺の施設を検索する。
         ユーザーが観光地や名所を探している場合にこの関数を呼び出すこと。
-        飲食店を探す場合は search_gourmet を使うこと。
         Args:
             lat: 検索の中心となる緯度
             lng: 検索の中心となる経度
@@ -75,7 +29,7 @@ def search_nearby_location(lat: float, lng: float, types: list[str], radius: flo
     headers = {
         "Content-Type": "application/json",
         "X-Goog-Api-Key": api_key,
-        "X-Goog-FieldMask": "places.displayName,places.formattedAddress,places.location,places.primaryTypeDisplayName,places.editorialSummary,places.regularOpeningHours.weekdayDescriptions", 
+        "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.location,places.primaryTypeDisplayName,places.editorialSummary,places.regularOpeningHours.weekdayDescriptions",
         }
 
     body = {
@@ -105,6 +59,9 @@ def search_nearby_location(lat: float, lng: float, types: list[str], radius: flo
     simplified = []
     for place in data["places"]:
         simplified.append({
+            # place_id はラッパーが get_place_details に渡すためのもの。
+            # docstring に書かない＝Gemini には見せない。
+            "place_id": place["id"],
             "name": place["displayName"]["text"],
             "address": place["formattedAddress"],
             "lat": place["location"]["latitude"],
@@ -113,7 +70,7 @@ def search_nearby_location(lat: float, lng: float, types: list[str], radius: flo
             "description": place.get("editorialSummary", {}).get("text"),
             "opening_hours": place.get("regularOpeningHours", {}).get("weekdayDescriptions"),
         })
-    print(f"★ 返した候補: {[p['name'] for p in simplified]}")
+    print(f"★ 返した候補: {[(p['name'], p['place_id']) for p in simplified]}") 
     return simplified
 
 def geocode_place(place_name: str) -> dict:
@@ -200,6 +157,50 @@ def get_walking_leg(travel_origin: str, destination: str) -> dict:
         "destination": destination,
         "distance_m": distance,
         "duration_min": duration_min,
+    }
+
+def get_place_details(place_id: str) -> dict:
+    """place_id から口コミと要約を取得する。
+
+    Gemini には登録しない。main.py のラッパーがコードから呼ぶ。
+    Place Details のフィールドマスクは prefix なし。
+    search_nearby_location（"places." が付く）とは記法が違うので使い回さない。
+
+    Args:
+        place_id: search_nearby_location が返した place_id
+
+    Returns:
+        summary（Googleの要約）、reviews（口コミ本文のリスト・最大5件）を含む辞書。
+        失敗時は {"error": ...}。例外は投げない。
+    """
+    print(f"★ get_place_details が呼ばれました。 {place_id}")
+    api_key = os.environ.get("GOOGLE_MAPS_API_KEY")
+    url = f"https://places.googleapis.com/v1/places/{place_id}"
+    headers = {
+        "X-Goog-Api-Key": api_key,
+        "X-Goog-FieldMask": "displayName,reviewSummary,reviews",
+    }
+    params = {"languageCode": "ja", "regionCode": "JP"}
+
+    response = requests.get(url, headers=headers, params=params)
+    status = response.status_code
+    if status != 200:
+        # Google が返すエラー本文を捨てない（原因の切り分けに要る）
+        print(f"★ get_place_details 失敗 {status}: {response.text[:200]}")
+        return {"error": f"エラーコード{status}: 正常に取得できませんでした。"}
+
+    data = response.json()
+
+    reviews = []
+    for r in data.get("reviews", []):
+        text = (r.get("text") or r.get("originalText") or {}).get("text", "")
+        if text:
+            reviews.append(text.strip())
+
+    return {
+        "name": data.get("displayName", {}).get("text"),
+        "summary": ((data.get("reviewSummary") or {}).get("text") or {}).get("text"),
+        "reviews": reviews,
     }
 
 

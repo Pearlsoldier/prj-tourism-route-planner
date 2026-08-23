@@ -38,18 +38,18 @@ def verify_token(authorization: str | None = Header(None)) -> str:
     """Authorization ヘッダーのアクセスキーを照合し、持ち主の名前を返す。"""
     if authorization is None:
         print("★ 認証失敗: Authorization ヘッダーなし")
-        raise HTTPException(status_code=401, detail="認証に失敗しました")
+        raise HTTPException(status_code=401, detail="アクセスキーが正しくありません。設定画面でアクセスキーを入力してください。")
 
     if not authorization.startswith("Bearer "):
         print("★ 認証失敗: 形式が不正")
-        raise HTTPException(status_code=401, detail="認証に失敗しました")
+        raise HTTPException(status_code=401, detail="アクセスキーが正しくありません。設定画面でアクセスキーを入力してください。")
 
     token = authorization[len("Bearer "):]
     who = ACCESS_KEYS.get(token)
 
     if who is None:
         print("★ 認証失敗: 未登録のアクセスキー")
-        raise HTTPException(status_code=401, detail="認証に失敗しました")
+        raise HTTPException(status_code=401, detail="アクセスキーが正しくありません。設定画面でアクセスキーを入力してください。")
 
     print(f"★ 認証OK: {who}")
     return who
@@ -58,6 +58,7 @@ app = FastAPI()
 
 origins = ["http://localhost:5173", "https://prj-tourism-route-planner.vercel.app"]
 sessions = {}
+place_cache: dict[str, dict] = {}
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -66,6 +67,49 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+def fetch_details_cached(place_id: str) -> dict:
+    """place_cache を先に見る。無ければ取りに行って入れる。
+
+    ラッパーの外側に置くのは、既存のラッパーが「元の関数を実行した後」に動くため。
+    実行後に判定してもリクエストは飛んでいる（8/13 の not in ガードと同じ構図）。
+    キャッシュは呼ぶ前に止めないと課金が止まらない。
+    """
+    if place_id in place_cache:
+        print(f"★ cache HIT  {place_id}")
+        return place_cache[place_id]
+
+    print(f"★ cache MISS {place_id} → Place Details 発行")
+    details = functions.tools.get_place_details(place_id)
+    if "error" not in details:
+        place_cache[place_id] = details   # 失敗をキャッシュしない
+    return details
+
+def with_details(func):
+    """search_nearby_location を包み、候補に口コミと要約を足して返す。
+
+    既存の record_to_guidebook とは役割が違う。
+    あちらは「戻り値をしおりに書く」もので、こちらは「戻り値を膨らませる」もの。
+    しおりには書かない（口コミを candidates に持つと system_instruction が毎ターン膨らむ）。
+    """
+    import functools
+
+    @functools.wraps(func)   # docstring を引き継ぐ。SDK がスキーマ生成に使う（7/29 に確認済み）
+    def wrapper(*args, **kwargs):
+        results = func(*args, **kwargs)
+
+        for place in results:
+            place_id = place.get("place_id")
+            if not place_id:
+                continue          # エラー要素（[{"error": ...}]）はここで素通りする
+            details = fetch_details_cached(place_id)
+            if "error" in details:
+                continue          # 取れなくても候補自体は残す
+            place["summary"] = details.get("summary")
+            place["reviews"] = details.get("reviews")
+
+        return results
+
+    return wrapper
 
 @app.get("/")
 async def hello():
@@ -115,8 +159,7 @@ async def chat_completions(request: ChatCompletionRequest, who: str = Depends(ve
                 reorder_places_w,
                 select_places,
                 set_start_time,
-                functions.tools.search_gourmet,
-                functions.tools.search_nearby_location,
+                with_details(functions.tools.search_nearby_location),
             ],
             system_instruction=build_system_instruction(plan),
             ),
