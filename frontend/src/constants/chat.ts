@@ -13,9 +13,12 @@ const dateString =
 // default system message obtained using the following method: https://twitter.com/DeminDimin/status/1619935545144279040
 export const _defaultSystemMessage =
   import.meta.env.VITE_DEFAULT_SYSTEM_MESSAGE ??
-  `You are ChatGPT, a large language model trained by OpenAI.
-Carefully heed the user's instructions. 
-Respond using Markdown.`;
+  `このアプリは、徒歩で巡る観光ルートを組み立てます。
+
+観光エリア・出発地・開始時刻を入力すると会話が始まります。
+提案された場所から行きたいところを選ぶたびに、しおりが1行ずつ増えていきます。
+
+（例）鎌倉をゆったりと観光したい。9時から鎌倉駅を出発予定です。`;
 
 export const modelOptions: ModelOptions[] = [
   'gpt-3.5-turbo',
