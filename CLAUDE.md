@@ -91,6 +91,8 @@ BetterChatGPT の Fork。エンドポイント設定画面（SettingsMenu）で�
 
 パスエイリアスは `vite.config.ts` で定義（`@components/`, `@store/`, `@hooks/` など）。
 
+フロントエンドはVercel（Static）でホスティング、バックエンドはRenderでホスティング。`frontend/middleware.ts`（Vercel Routing Middleware）でサイト全体にBasic認証をかけている。資格情報はVercelプロジェクトの環境変数 `BASIC_AUTH_USER` / `BASIC_AUTH_PASSWORD` に設定する（未設定だと全リクエストが500になる、fail-close）。ローカルの `npm run dev` / `vite build` では実行されず、Vercel上でのみ動作する。
+
 ## 主要な設計上の注意点
 
 - **Place Details のキャッシュ**: `place_cache` はプロセスのメモリ上のみ。再起動でリセットされる。
