@@ -11,13 +11,15 @@ import {
   LocalStorageInterfaceV5ToV6,
   LocalStorageInterfaceV6ToV7,
   LocalStorageInterfaceV7oV8,
+  LocalStorageInterfaceV8ToV9,
 } from '@type/chat';
 import {
   _defaultChatConfig,
+  _defaultSystemMessage,   // 追加
   defaultModel,
   defaultUserMaxToken,
 } from '@constants/chat';
-import { officialAPIEndpoint } from '@constants/auth';
+import { officialAPIEndpoint, defaultAPIEndpoint } from '@constants/auth';  // 追加
 import defaultPrompts from '@constants/prompt';
 
 export const migrateV0 = (persistedState: LocalStorageInterfaceV0ToV1) => {
@@ -103,4 +105,9 @@ export const migrateV7 = (persistedState: LocalStorageInterfaceV7oV8) => {
     if (chat.folder) chat.folder = folderNameToIdMap[chat.folder];
     chat.id = uuidv4();
   });
+};
+
+export const migrateV8 = (persistedState: LocalStorageInterfaceV8ToV9) => {
+  persistedState.defaultSystemMessage = _defaultSystemMessage;
+  persistedState.apiEndpoint = defaultAPIEndpoint;
 };

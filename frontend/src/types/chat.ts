@@ -159,3 +159,6 @@ export interface LocalStorageInterfaceV7oV8
   foldersExpanded: boolean[];
   folders: FolderCollection;
 }
+
+export interface LocalStorageInterfaceV8ToV9
+  extends LocalStorageInterfaceV7oV8 {}
