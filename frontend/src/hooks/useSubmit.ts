@@ -6,10 +6,9 @@ import { limitMessageTokens, updateTotalTokenUsed } from '@utils/messageUtils';
 import { _defaultChatConfig } from '@constants/chat';
 
 const useSubmit = () => {
-  const { t, i18n } = useTranslation('api');
+  const { i18n } = useTranslation('api');
   const error = useStore((state) => state.error);
   const setError = useStore((state) => state.setError);
-  const apiKey = useStore((state) => state.apiKey);
   const setGenerating = useStore((state) => state.setGenerating);
   const generating = useStore((state) => state.generating);
   const currentChatIndex = useStore((state) => state.currentChatIndex);
@@ -20,14 +19,10 @@ const useSubmit = () => {
   ): Promise<string> => {
     let data;
     try {
-      if (!apiKey || apiKey.length === 0) {
-        throw new Error(t('noApiKeyWarning') as string);
-      }
       data = await getChatCompletion(
         useStore.getState().apiEndpoint,
         message,
-        _defaultChatConfig,
-        apiKey
+        _defaultChatConfig
       );
     } catch (error: unknown) {
       throw new Error(`Error generating title!\n${(error as Error).message}`);
@@ -60,14 +55,10 @@ const useSubmit = () => {
       );
       if (messages.length === 0) throw new Error('Message exceed max token!');
 
-      if (!apiKey || apiKey.length === 0) {
-        throw new Error(t('noApiKeyWarning') as string);
-      }
       const data = await getChatCompletion(
         useStore.getState().apiEndpoint,
         messages,
-        chats[currentChatIndex].config,
-        apiKey
+        chats[currentChatIndex].config
       );
       if (data) {
         const updatedChats: ChatInterface[] = JSON.parse(
