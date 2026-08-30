@@ -5,6 +5,8 @@ venv/
 .venv/
 *.env
 .env
+spike_out/
+spike_out_genre/
 
 # --- Node / フロントエンド ---
 node_modules/
