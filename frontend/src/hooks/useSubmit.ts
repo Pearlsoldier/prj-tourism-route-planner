@@ -4,6 +4,11 @@ import { ChatInterface, MessageInterface } from '@type/chat';
 import { getChatCompletion } from '@api/api';
 import { limitMessageTokens, updateTotalTokenUsed } from '@utils/messageUtils';
 import { _defaultChatConfig } from '@constants/chat';
+import { defaultAPIEndpoint } from '@constants/auth';
+
+// 送信先とアクセスキーはビルド時に環境変数から埋め込む。
+// 利用者が設定画面で入力する必要はない。
+const accessKey = import.meta.env.VITE_ACCESS_KEY;
 
 const useSubmit = () => {
   const { i18n } = useTranslation('api');
@@ -20,9 +25,10 @@ const useSubmit = () => {
     let data;
     try {
       data = await getChatCompletion(
-        useStore.getState().apiEndpoint,
+        defaultAPIEndpoint,
         message,
-        _defaultChatConfig
+        _defaultChatConfig,
+        accessKey
       );
     } catch (error: unknown) {
       throw new Error(`Error generating title!\n${(error as Error).message}`);
@@ -56,9 +62,10 @@ const useSubmit = () => {
       if (messages.length === 0) throw new Error('Message exceed max token!');
 
       const data = await getChatCompletion(
-        useStore.getState().apiEndpoint,
+        defaultAPIEndpoint,
         messages,
-        chats[currentChatIndex].config
+        chats[currentChatIndex].config,
+        accessKey
       );
       if (data) {
         const updatedChats: ChatInterface[] = JSON.parse(
