@@ -167,16 +167,19 @@ async def chat_completions(request: ChatCompletionRequest, who: str = Depends(ve
     print(plan, plan.missing_fields())
 
     text = response.text
+    if text is None:
+        print("★ 応答テキストが空でした")
+        text = ""
 
-    # 並べ替え等で legs が空になっていたら、selected から組み直す
-    if len(plan.selected) >= 2 and not plan.legs:
-        print("★ legs を再計算します")
+    # legs が selected と噛み合っていなければ、selected から組み直す
+    if len(plan.selected) >= 2 and len(plan.legs) != len(plan.selected) - 1:
+        print(f"★ legs を再計算します（selected {len(plan.selected)}件 / legs {len(plan.legs)}件）")
+        plan.legs.clear()
         for i in range(len(plan.selected) - 1):
             get_walking_leg_w(
                 plan.selected[i]["name"],
                 plan.selected[i + 1]["name"],
             )
-
     if plan.is_ready():
         timeline = build_timeline(plan.selected, plan.legs, plan.start_time or "09:00")
         summary = summarize_plan(timeline, plan.selected)
