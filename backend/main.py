@@ -8,7 +8,7 @@ from google import genai
 from google.genai import types
 from models.guidebook import Guidebook
 import hashlib
-from functions.wraped_tools import record_to_guidebook, make_select_places, make_set_start_time, make_reorder_places
+from backend.functions.wrapped_tools import record_to_guidebook, make_select_places, make_set_start_time, make_reorder_places
 import functions.tools
 from timeline import build_timeline, format_timeline_markdown, summarize_plan, format_summary_markdown
 from prompts import build_system_instruction
@@ -133,9 +133,6 @@ async def chat_completions(request: ChatCompletionRequest, who: str = Depends(ve
     get_walking_leg_w = recorder_legs(functions.tools.get_walking_leg)
     select_places = make_select_places(plan)
     set_start_time = make_set_start_time(plan)
-    import inspect
-    print(inspect.signature(geocode_place_w))
-    print(geocode_place_w.__doc__)
     contents = []
     for m in request.messages:
         if m.role == "system":
