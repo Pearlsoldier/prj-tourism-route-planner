@@ -15,10 +15,11 @@ def search_nearby_location(lat: float, lng: float, types: list[str], radius: flo
                     徒歩で狭く巡る場合は 1000、駅周辺を広く見る場合は 3000、
                     市内全域なら 5000 程度を目安にする。最大 50000。
             types: 検索したい施設カテゴリのリスト。用途に応じて以下から選択する。
-                - 観光・文化: museum, art_gallery, historical_place, cultural_landmark,
-                    monument, tourist_attraction, park, historical_landmark
-                - 宗教施設: shinto_shrine（神社）, buddhist_temple（仏閣）, church
-                - 買い物: shopping_mall, gift_shop, market
+                - 史跡: historical_place, historical_landmark, monument, castle
+                - 神社仏閣: shinto_shrine（神社）, buddhist_temple（仏閣）
+                - アート: art_museum, art_gallery, art_studio, sculpture
+                - 博物館: museum, history_museum, visitor_center
+                - 庭園: garden, botanical_garden, city_park
         Returns:
             観光地のリスト。各要素は name, address, lat, lng, type, description, opening_hoursを含む。
     """
@@ -29,11 +30,11 @@ def search_nearby_location(lat: float, lng: float, types: list[str], radius: flo
     headers = {
         "Content-Type": "application/json",
         "X-Goog-Api-Key": api_key,
-        "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.location,places.primaryTypeDisplayName,places.editorialSummary,places.regularOpeningHours.weekdayDescriptions",
+        "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.location,places.primaryType,places.primaryTypeDisplayName,places.editorialSummary,places.regularOpeningHours.weekdayDescriptions",
         }
 
     body = {
-        "includedTypes": types,
+        "includedPrimaryTypes": types,
         "maxResultCount": 5,
         "languageCode": "ja", 
         "locationRestriction": {
@@ -67,6 +68,7 @@ def search_nearby_location(lat: float, lng: float, types: list[str], radius: flo
             "lat": place["location"]["latitude"],
             "lng": place["location"]["longitude"],
             "type": place.get("primaryTypeDisplayName", {}).get("text"),
+            "primary_type": place.get("primaryType"),
             "description": place.get("editorialSummary", {}).get("text"),
             "opening_hours": place.get("regularOpeningHours", {}).get("weekdayDescriptions"),
         })
