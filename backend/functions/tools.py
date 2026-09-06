@@ -35,7 +35,7 @@ def search_nearby_location(lat: float, lng: float, types: list[str], radius: flo
 
     body = {
         "includedPrimaryTypes": types,
-        "maxResultCount": 5,
+        "maxResultCount": 20,
         "languageCode": "ja", 
         "locationRestriction": {
             "circle": {
