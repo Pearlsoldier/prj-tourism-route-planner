@@ -178,6 +178,7 @@ INTEREST_TABLE = {
 STAY_MINUTES = 60        # 各地点の滞在時間（起点は 0）
 SEARCH_RADIUS = 1500.0   # search_nearby_location に渡す半径（m）
 NEARBY_LIMIT_KM = 1.5    # 現在地からこの距離までを「歩ける範囲」とみなす
+MIN_SPOT_DISTANCE_M = 150.0  # これより近い候補は同一施設の構成要素とみなして除外
 
 
 # ---------------------------------------------------------------
@@ -319,6 +320,24 @@ def make_build_route(plan, fetch_details):
             for cand in candidates:
                 if cand["name"] in visited:
                     continue
+
+                # 採用済みの全地点（起点を含む）に近すぎる候補は、
+                # 同一施設の構成要素（チケット売り場・橋など）とみなして除く。
+                too_close = False
+                for stop in stops:
+                    dist_m = _distance_km(
+                        stop["lat"], stop["lng"], cand["lat"], cand["lng"]
+                    ) * 1000
+                    if dist_m <= MIN_SPOT_DISTANCE_M:
+                        print(
+                            f"★ 候補除外: {cand['name']}（{stop['name']} から "
+                            f"{dist_m:.0f}m、同一施設の構成要素とみなす）"
+                        )
+                        too_close = True
+                        break
+                if too_close:
+                    continue
+
                 km = _distance_km(
                     current["lat"], current["lng"], cand["lat"], cand["lng"]
                 )
