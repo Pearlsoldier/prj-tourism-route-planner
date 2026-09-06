@@ -167,17 +167,16 @@ BUDGET_TABLE = {
 INTEREST_TABLE = {
     # tourist_attraction は入れない。
     # 観光客が行く場所すべてに付く広すぎる分類で、
-    # 「歴史・文化」を選んだのにフードホールが出た（2026-09-05 実測）。
-    "歴史・文化": [
-        "museum", "art_gallery", "historical_place",
-        "cultural_landmark", "monument", "historical_landmark",
-    ],
-    "神社仏閣": ["shinto_shrine", "buddhist_temple", "church"],
-    "買い物": ["shopping_mall", "gift_shop", "market"],
+    # 「歴史・文化」を選んだのにフードホールが出た（2026-09-05 実測、旧軸での話）。
+    "史跡": ["historical_place", "historical_landmark", "monument", "castle"],
+    "神社仏閣": ["shinto_shrine", "buddhist_temple"],
+    "アート": ["art_museum", "art_gallery", "art_studio", "sculpture"],
+    "博物館": ["museum", "history_museum", "visitor_center"],
+    "庭園": ["garden", "botanical_garden", "city_park"],
 }
 
 STAY_MINUTES = 60        # 各地点の滞在時間（起点は 0）
-SEARCH_RADIUS = 3000.0   # search_nearby_location に渡す半径（m）
+SEARCH_RADIUS = 1500.0   # search_nearby_location に渡す半径（m）
 NEARBY_LIMIT_KM = 1.5    # 現在地からこの距離までを「歩ける範囲」とみなす
 
 
@@ -259,8 +258,8 @@ def make_build_route(plan, fetch_details):
                 1 = 3〜4時間、2 = 6〜8時間、3 = 10時間以上。
                 分に変換せず、番号のまま整数で渡すこと。
             interests: 興味のあるジャンル名の日本語のリスト。
-                「歴史・文化」「神社仏閣」「買い物」のいずれかを含めること。
-                （例：["歴史・文化", "神社仏閣"]）
+                「史跡」「神社仏閣」「アート」「博物館」「庭園」のいずれかを含めること。
+                （例：["史跡", "神社仏閣"]）
 
         Returns:
             start_time, end_time, total_minutes, stops, legs を含む辞書。
