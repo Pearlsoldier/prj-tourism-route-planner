@@ -1,3 +1,13 @@
+import math
+
+from functions.tools import (
+    geocode_place,
+    search_nearby_location,
+    get_walking_leg,
+    get_place_details,
+)
+
+
 import functools
 from models.guidebook import Guidebook
 print("[import] wrapped_tools を読み込み開始")
@@ -133,3 +143,277 @@ def make_reorder_places(plan: Guidebook):
         return {"selected": [p["name"] for p in plan.selected]}
 
     return reorder_places
+
+"""build_route の実装。
+
+wrapped_tools.py に追記して使う想定。
+ファイル先頭の import と定数は、既存の import 群のそばにまとめて置くこと。
+"""
+
+# ---------------------------------------------------------------
+# 対応表・定数
+# ---------------------------------------------------------------
+
+# 自由時間の選択肢（prompts.py の手順3の番号と対応）
+# 予算は幅の下限を取る。少なめに組んで余らせるほうが、超過するより安全。
+BUDGET_TABLE = {
+    1: {"minutes": 180, "max_stops": 3},   # 3〜4時間
+    2: {"minutes": 360, "max_stops": 6},   # 6〜8時間
+    3: {"minutes": 600, "max_stops": 8},   # 10時間以上
+}
+
+# 興味のジャンル（prompts.py の手順4の選択肢と対応）
+# Gemini に英語の種別名を選ばせない。ここで一元管理する。
+INTEREST_TABLE = {
+    # tourist_attraction は入れない。
+    # 観光客が行く場所すべてに付く広すぎる分類で、
+    # 「歴史・文化」を選んだのにフードホールが出た（2026-09-05 実測）。
+    "歴史・文化": [
+        "museum", "art_gallery", "historical_place",
+        "cultural_landmark", "monument", "historical_landmark",
+    ],
+    "神社仏閣": ["shinto_shrine", "buddhist_temple", "church"],
+    "買い物": ["shopping_mall", "gift_shop", "market"],
+}
+
+STAY_MINUTES = 60        # 各地点の滞在時間（起点は 0）
+SEARCH_RADIUS = 3000.0   # search_nearby_location に渡す半径（m）
+NEARBY_LIMIT_KM = 1.5    # 現在地からこの距離までを「歩ける範囲」とみなす
+
+
+# ---------------------------------------------------------------
+# 補助関数
+# ---------------------------------------------------------------
+
+def _distance_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    """2点間の直線距離（km）。Haversine の公式。
+
+    実際の徒歩距離は get_walking_leg で測る。
+    ここでは候補を絞り込むためだけに使う（API を呼ぶ回数を減らす目的）。
+    """
+    earth_radius_km = 6371.0
+    phi1 = math.radians(lat1)
+    phi2 = math.radians(lat2)
+    delta_phi = math.radians(lat2 - lat1)
+    delta_lambda = math.radians(lng2 - lng1)
+
+    a = (
+        math.sin(delta_phi / 2) ** 2
+        + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2) ** 2
+    )
+    return 2 * earth_radius_km * math.asin(math.sqrt(a))
+
+
+def _add_minutes(hhmm: str, minutes: int) -> str:
+    """"HH:MM" に分を足して "HH:MM" で返す。"""
+    hour, minute = map(int, hhmm.split(":"))
+    total = hour * 60 + minute + minutes
+    return f"{(total // 60) % 24:02d}:{total % 60:02d}"
+
+
+def _types_from_interests(interests: list[str]) -> list[str]:
+    """日本語のジャンル名を Places API の種別名に変換する。
+
+    重複は取り除き、渡された順序は保つ。
+    """
+    types: list[str] = []
+    for name in interests:
+        for t in INTEREST_TABLE.get(name, []):
+            if t not in types:
+                types.append(t)
+    return types
+
+
+# ---------------------------------------------------------------
+# 本体
+# ---------------------------------------------------------------
+
+def make_build_route(plan, fetch_details):
+    """build_route を作って返す。
+
+    Args:
+        plan: 記録先の Guidebook。
+        fetch_details: place_id を受け取って口コミ・要約を返す関数。
+            main.py の fetch_details_cached を渡すこと。
+            tools.get_place_details を直接渡すとキャッシュが効かず、
+            同じ場所に何度も課金される。
+    """
+    def build_route(
+        origin: str,
+        start_time: str,
+        budget_choice: int,
+        interests: list[str],
+    ) -> dict:
+        """ヒアリングした4項目をもとに、徒歩の観光ルートを組み立てる。
+
+        起点・開始時刻・自由時間・興味のジャンルがすべて揃ってから呼び出すこと。
+        1つでも欠けている場合は呼び出してはいけない。
+
+        経由地の選定・順番・所要時間の計算はすべてこの関数の内部で行う。
+        戻り値の時刻や距離をあなたが計算し直す必要はない。
+
+        Args:
+            origin: 起点にする駅名または施設名（例：広島駅）
+            start_time: 歩き始める時刻。"HH:MM" 形式の24時間表記（例："09:00"）
+            budget_choice: 自由時間の選択肢の番号。
+                1 = 3〜4時間、2 = 6〜8時間、3 = 10時間以上。
+                分に変換せず、番号のまま整数で渡すこと。
+            interests: 興味のあるジャンル名の日本語のリスト。
+                「歴史・文化」「神社仏閣」「買い物」のいずれかを含めること。
+                （例：["歴史・文化", "神社仏閣"]）
+
+        Returns:
+            start_time, end_time, total_minutes, stops, legs を含む辞書。
+            stops の各要素は name, arrival_time, departure_time, stay_minutes,
+            address, description, summary, opening_hours を持つ。
+            失敗した場合は error を含む辞書。
+        """
+        print(f"★ build_route が呼ばれました。 {origin} / {start_time} / "
+              f"choice={budget_choice} / {interests}")
+
+        # --- 引数の検証 ---
+        try:
+            budget = BUDGET_TABLE[int(budget_choice)]
+        except (KeyError, ValueError, TypeError):
+            return {"error": "自由時間の選択肢は 1・2・3 のいずれかを整数で渡してください。"}
+
+        types = _types_from_interests(interests)
+        if not types:
+            return {
+                "error": "ジャンルが判別できませんでした。",
+                "指定できるジャンル": list(INTEREST_TABLE),
+            }
+
+        # --- 起点の座標を取る ---
+        geo = geocode_place(origin)
+        if "error" in geo:
+            return geo
+
+        # --- 起点をしおりの1件目に置く ---
+        stops = [{
+            "name": origin,
+            "lat": geo["lat"],
+            "lng": geo["lng"],
+            "address": geo["address"],
+            "arrival_time": start_time,
+            "departure_time": start_time,
+            "stay_minutes": 0,
+        }]
+        legs: list[dict] = []
+        visited = {origin}
+
+        used_minutes = 0
+        clock = start_time
+        current = stops[0]
+
+        # --- 数珠つなぎで経由地を足していく ---
+        while len(stops) - 1 < budget["max_stops"]:
+            candidates = search_nearby_location(
+                current["lat"], current["lng"], types, SEARCH_RADIUS
+            )
+            if not candidates or "error" in candidates[0]:
+                print("   [build_route] 候補が取得できないため打ち切り")
+                break
+
+            # 直線距離で絞る。訪問済みは除く。
+            nearby = []
+            for cand in candidates:
+                if cand["name"] in visited:
+                    continue
+                km = _distance_km(
+                    current["lat"], current["lng"], cand["lat"], cand["lng"]
+                )
+                if km <= NEARBY_LIMIT_KM:
+                    nearby.append((km, cand))
+
+            if not nearby:
+                print("   [build_route] 歩ける範囲に未訪問の候補なし。打ち切り")
+                break
+
+            # 近い順に見て、予算に収まる1件を採る
+            nearby.sort(key=lambda pair: pair[0])
+            picked = None
+            budget_over = False
+
+            for _, cand in nearby:
+                leg = get_walking_leg(current["name"], cand["name"])
+                if "error" in leg:
+                    continue  # この候補は測れない。次を試す
+
+                cost = leg["duration_min"] + STAY_MINUTES
+                if used_minutes + cost > budget["minutes"]:
+                    # 近い順に見ているので、これで超えるなら残りも超える
+                    budget_over = True
+                    break
+
+                picked = (cand, leg, cost)
+                break
+
+            if budget_over:
+                print(f"   [build_route] 予算 {budget['minutes']}分 に収まらないため打ち切り")
+                break
+            if picked is None:
+                print("   [build_route] 採用できる候補がないため打ち切り")
+                break
+
+            cand, leg, cost = picked
+
+            arrival = _add_minutes(clock, leg["duration_min"])
+            departure = _add_minutes(arrival, STAY_MINUTES)
+
+            stops.append({
+                "name": cand["name"],
+                "place_id": cand["place_id"],
+                "lat": cand["lat"],
+                "lng": cand["lng"],
+                "address": cand["address"],
+                "type": cand.get("type"),
+                "description": cand.get("description"),
+                "opening_hours": cand.get("opening_hours"),
+                "arrival_time": arrival,
+                "departure_time": departure,
+                "stay_minutes": STAY_MINUTES,
+            })
+            legs.append({
+                "from": current["name"],
+                "to": cand["name"],
+                "distance_m": leg["distance_m"],
+                "duration_min": leg["duration_min"],
+            })
+
+            visited.add(cand["name"])
+            used_minutes += cost
+            clock = departure
+            current = stops[-1]
+
+        if len(stops) == 1:
+            return {"error": "条件に合う観光地が見つかりませんでした。"
+                             "起点やジャンルを変えて試してください。"}
+
+        # --- 確定した地点だけ口コミを取りに行く ---
+        # 絞り込みの前に呼ぶと、捨てる候補にも課金される（2026-07-29 の方針）
+        for stop in stops[1:]:
+            details = fetch_details(stop["place_id"])
+            if "error" not in details:
+                stop["summary"] = details.get("summary")
+                stop["reviews"] = details.get("reviews")
+
+        # --- しおりに記録する ---
+        plan.origin = stops[0]
+        plan.selected = stops
+        plan.legs = legs
+        plan.start_time = start_time
+
+        result = {
+            "start_time": start_time,
+            "end_time": clock,
+            "total_minutes": used_minutes,
+            "budget_minutes": budget["minutes"],
+            "stops": stops,
+            "legs": legs,
+        }
+        print(f"★ ルートを組みました。 {[s['name'] for s in stops]} / "
+              f"{used_minutes}分（予算 {budget['minutes']}分）")
+        return result
+
+    return build_route

@@ -8,9 +8,8 @@ from google import genai
 from google.genai import types
 from models.guidebook import Guidebook
 import hashlib
-from backend.functions.wrapped_tools import record_to_guidebook, make_select_places, make_set_start_time, make_reorder_places
+from functions.wrapped_tools import make_build_route
 import functions.tools
-from timeline import build_timeline, format_timeline_markdown, summarize_plan, format_summary_markdown
 from prompts import build_system_instruction
 
 load_dotenv()
@@ -84,33 +83,6 @@ def fetch_details_cached(place_id: str) -> dict:
         place_cache[place_id] = details   # 失敗をキャッシュしない
     return details
 
-def with_details(func):
-    """search_nearby_location を包み、候補に口コミと要約を足して返す。
-
-    既存の record_to_guidebook とは役割が違う。
-    あちらは「戻り値をしおりに書く」もので、こちらは「戻り値を膨らませる」もの。
-    しおりには書かない（口コミを candidates に持つと system_instruction が毎ターン膨らむ）。
-    """
-    import functools
-
-    @functools.wraps(func)   # docstring を引き継ぐ。SDK がスキーマ生成に使う（7/29 に確認済み）
-    def wrapper(*args, **kwargs):
-        results = func(*args, **kwargs)
-
-        for place in results:
-            place_id = place.get("place_id")
-            if not place_id:
-                continue          # エラー要素（[{"error": ...}]）はここで素通りする
-            details = fetch_details_cached(place_id)
-            if "error" in details:
-                continue          # 取れなくても候補自体は残す
-            place["summary"] = details.get("summary")
-            place["reviews"] = details.get("reviews")
-
-        return results
-
-    return wrapper
-
 @app.get("/")
 async def hello():
     return {"message": "Hello,World"}
@@ -126,13 +98,10 @@ async def chat_completions(request: ChatCompletionRequest, who: str = Depends(ve
     print(session_key)
 
     plan = sessions.setdefault(session_key, Guidebook())
-    recorder_origin = record_to_guidebook(plan, "origin")
-    geocode_place_w = recorder_origin(functions.tools.geocode_place)
-    reorder_places_w = make_reorder_places(plan)
-    recorder_legs = record_to_guidebook(plan, "legs", "append")
-    get_walking_leg_w = recorder_legs(functions.tools.get_walking_leg)
-    select_places = make_select_places(plan)
-    set_start_time = make_set_start_time(plan)
+    # Gemini に見せるツールは build_route ひとつだけ。
+    # geocode や get_walking_leg を個別に登録すると、Gemini がそれらを
+    # 単独で呼び始め、ルートの組み立てが会話の外に漏れる。
+    build_route = make_build_route(plan, fetch_details_cached)
     contents = []
     for m in request.messages:
         if m.role == "system":
@@ -150,14 +119,7 @@ async def chat_completions(request: ChatCompletionRequest, who: str = Depends(ve
         model="gemini-3.5-flash-lite",
         contents=contents,
         config=types.GenerateContentConfig(
-            tools=[
-                geocode_place_w,
-                get_walking_leg_w,
-                reorder_places_w,
-                select_places,
-                set_start_time,
-                with_details(functions.tools.search_nearby_location),
-            ],
+            tools=[build_route],
             system_instruction=build_system_instruction(plan),
             ),
         )
@@ -168,19 +130,8 @@ async def chat_completions(request: ChatCompletionRequest, who: str = Depends(ve
         print("★ 応答テキストが空でした")
         text = ""
 
-    # legs が selected と噛み合っていなければ、selected から組み直す
-    if len(plan.selected) >= 2 and len(plan.legs) != len(plan.selected) - 1:
-        print(f"★ legs を再計算します（selected {len(plan.selected)}件 / legs {len(plan.legs)}件）")
-        plan.legs.clear()
-        for i in range(len(plan.selected) - 1):
-            get_walking_leg_w(
-                plan.selected[i]["name"],
-                plan.selected[i + 1]["name"],
-            )
-    if plan.is_ready():
-        timeline = build_timeline(plan.selected, plan.legs, plan.start_time or "09:00")
-        summary = summarize_plan(timeline, plan.selected)
-        text += "\n\n" + format_timeline_markdown(timeline)
-        text += "\n" + format_summary_markdown(summary)
+    # 表（timeline）の追記はしない。
+    # build_route が時刻まで確定させ、Gemini がそれを文章で案内するため、
+    # 表を足すと同じ内容が二重に出る（2026-09-05 の判断）。
 
     return {"choices": [{"message": {"content": text}}]}

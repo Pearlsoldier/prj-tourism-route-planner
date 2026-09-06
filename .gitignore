@@ -7,6 +7,7 @@ venv/
 .env
 spike_out/
 spike_out_genre/
+backend/test.py
 
 # --- Node / フロントエンド ---
 node_modules/
