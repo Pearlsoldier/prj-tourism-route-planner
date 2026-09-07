@@ -179,6 +179,7 @@ STAY_MINUTES = 60        # 各地点の滞在時間（起点は 0）
 SEARCH_RADIUS = 1500.0   # search_nearby_location に渡す半径（m）
 NEARBY_LIMIT_KM = 1.5    # 現在地からこの距離までを「歩ける範囲」とみなす
 MIN_SPOT_DISTANCE_M = 150.0  # これより近い候補は同一施設の構成要素とみなして除外
+SPOT_GROUP_DISTANCE_M = 300.0  # 1回の検索結果の中で、これ以内の候補は同一施設とみなしてグループ化する
 
 
 # ---------------------------------------------------------------
@@ -236,6 +237,46 @@ def _interest_of_type(type_name: str | None) -> str | None:
     該当なしの場合は None を返す。
     """
     return _TYPE_TO_INTEREST.get(type_name)
+
+
+def _dedupe_by_area(candidates: list[dict]) -> list[dict]:
+    """近接する候補を同一施設の構成要素とみなしてグループ化し、代表1件に集約する。
+
+    1件目を起点に SPOT_GROUP_DISTANCE_M 以内の候補を集めてグループとし、
+    残りに対して同じことを繰り返す単純な方法（候補は最大20件なので総当たりで十分）。
+    各グループの代表は user_rating_count が最大の候補。同点の場合は
+    元のリストで先に出現したものを採る。戻り値は元の並び順を保つ。
+    """
+    remaining = list(enumerate(candidates))
+    groups: list[list[tuple[int, dict]]] = []
+
+    while remaining:
+        seed_idx, seed = remaining.pop(0)
+        group = [(seed_idx, seed)]
+        rest = []
+        for idx, cand in remaining:
+            dist_m = _distance_km(
+                seed["lat"], seed["lng"], cand["lat"], cand["lng"]
+            ) * 1000
+            if dist_m <= SPOT_GROUP_DISTANCE_M:
+                group.append((idx, cand))
+            else:
+                rest.append((idx, cand))
+        remaining = rest
+        groups.append(group)
+
+    representatives: list[tuple[int, dict]] = []
+    for group in groups:
+        rep_idx, rep = max(group, key=lambda pair: pair[1].get("user_rating_count", 0))
+        representatives.append((rep_idx, rep))
+        if len(group) > 1:
+            print(
+                f"★ 同一施設としてグループ化: "
+                f"{[c['name'] for _, c in group]} → 代表「{rep['name']}」"
+            )
+
+    representatives.sort(key=lambda pair: pair[0])
+    return [rep for _, rep in representatives]
 
 
 # ---------------------------------------------------------------
@@ -329,6 +370,8 @@ def make_build_route(plan, fetch_details):
             if not candidates or "error" in candidates[0]:
                 print("   [build_route] 候補が取得できないため打ち切り")
                 break
+
+            candidates = _dedupe_by_area(candidates)
 
             # 直線距離で絞る。訪問済みは除く。
             nearby = []
