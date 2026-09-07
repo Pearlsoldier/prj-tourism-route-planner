@@ -224,6 +224,20 @@ def _types_from_interests(interests: list[str]) -> list[str]:
     return types
 
 
+# INTEREST_TABLE の逆引き（type -> ジャンル名）。ベタ書きせず動的に作る。
+_TYPE_TO_INTEREST = {
+    t: genre for genre, types in INTEREST_TABLE.items() for t in types
+}
+
+
+def _interest_of_type(type_name: str | None) -> str | None:
+    """Places API の primary_type から、対応する興味ジャンル名を引く。
+
+    該当なしの場合は None を返す。
+    """
+    return _TYPE_TO_INTEREST.get(type_name)
+
+
 # ---------------------------------------------------------------
 # 本体
 # ---------------------------------------------------------------
@@ -305,6 +319,7 @@ def make_build_route(plan, fetch_details):
         used_minutes = 0
         clock = start_time
         current = stops[0]
+        genres_covered: set[str] = set()
 
         # --- 数珠つなぎで経由地を足していく ---
         while len(stops) - 1 < budget["max_stops"]:
@@ -350,10 +365,31 @@ def make_build_route(plan, fetch_details):
 
             # 近い順に見て、予算に収まる1件を採る
             nearby.sort(key=lambda pair: pair[0])
+
+            # ジャンル枠: まだ1件も採用していないジャンルがあれば優先する
+            remaining_genres = [g for g in interests if g not in genres_covered]
+            pool = nearby
+            quota_genre = None
+            if remaining_genres:
+                for g in remaining_genres:
+                    genre_pool = [
+                        pair for pair in nearby
+                        if _interest_of_type(pair[1].get("primary_type")) == g
+                    ]
+                    if genre_pool:
+                        pool = genre_pool
+                        quota_genre = g
+                        break
+                else:
+                    print(
+                        f"   [build_route] 未充足ジャンル {remaining_genres} の候補が"
+                        f"範囲内に無いためスキップ。通常ロジックで選ぶ"
+                    )
+
             picked = None
             budget_over = False
 
-            for _, cand in nearby:
+            for _, cand in pool:
                 leg = get_walking_leg(current["name"], cand["name"])
                 if "error" in leg:
                     continue  # この候補は測れない。次を試す
@@ -375,6 +411,12 @@ def make_build_route(plan, fetch_details):
                 break
 
             cand, leg, cost = picked
+
+            if quota_genre:
+                print(f"★ ジャンル枠「{quota_genre}」から採用: {cand['name']}")
+                genres_covered.add(quota_genre)
+                if all(g in genres_covered for g in interests):
+                    print("★ 全ジャンルの枠が埋まりました。以降は通常ロジックで選びます")
 
             arrival = _add_minutes(clock, leg["duration_min"])
             departure = _add_minutes(arrival, STAY_MINUTES)
