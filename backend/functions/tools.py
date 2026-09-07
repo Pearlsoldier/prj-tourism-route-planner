@@ -30,7 +30,7 @@ def search_nearby_location(lat: float, lng: float, types: list[str], radius: flo
     headers = {
         "Content-Type": "application/json",
         "X-Goog-Api-Key": api_key,
-        "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.location,places.primaryType,places.primaryTypeDisplayName,places.editorialSummary,places.regularOpeningHours.weekdayDescriptions",
+        "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.location,places.primaryType,places.primaryTypeDisplayName,places.editorialSummary,places.regularOpeningHours.weekdayDescriptions,places.userRatingCount,places.rating",
         }
 
     body = {
@@ -71,6 +71,8 @@ def search_nearby_location(lat: float, lng: float, types: list[str], radius: flo
             "primary_type": place.get("primaryType"),
             "description": place.get("editorialSummary", {}).get("text"),
             "opening_hours": place.get("regularOpeningHours", {}).get("weekdayDescriptions"),
+            "user_rating_count": place.get("userRatingCount", 0),
+            "rating": place.get("rating"),
         })
     print(f"★ 返した候補: {[(p['name'], p['place_id']) for p in simplified]}") 
     return simplified
