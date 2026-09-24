@@ -61,7 +61,7 @@
 | # | タスク | 分類 | ブランチ |
 |---|---|---|---|
 | 1-1 | ~~Google Cloud の予算アラート＋APIキーの quota 設定~~ **✅ 完了 2026-09-23** | 片付け | （コード変更なし） |
-| 1-2 | **uv へ移行**（`pyproject.toml` + `uv.lock`、Python 3.13 固定、`protobuf`/`asyncpg` 除去、Render のビルド設定切り替え）→ 詳細は付録D | 片付け | `chore/migrate-to-uv` |
+| 1-2 | **uv へ移行**（`pyproject.toml` + `uv.lock`、Python 3.13 固定、`protobuf`/`asyncpg` 除去、Render のビルド設定切り替え）→ 詳細は付録D | 片付け | `main`（段階ごとに直接コミット・付録D参照） |
 | 1-3 | `timeline.py`・`timeline.py.bak` の処分、スパイク2本の扱い決定、fork由来の `deploy.yml` 削除、マージ済みブランチ整理 | 片付け | `chore/housekeeping` |
 | 1-3b | **フロントの lock ファイル二重問題を解消**（npm / yarn のどちらを正とするか決め、負けた方の lock を削除）→ 詳細は付録C | 片付け | `chore/housekeeping` |
 | 1-4 | pytest 導入＋純粋関数テスト3本 | テスト | `test/pure-functions` |
@@ -286,6 +286,21 @@ frontend/package.json          2,737 bytes   Aug 25 22:55
 | `package.json` 内の yarn 参照 | `electron` / `pack` / `make` スクリプトのみ（fork元由来、本プロジェクトでは未使用） |
 | CLAUDE.md の記載 | `npm run dev` / `npm run build` |
 
+### 追加証拠（2026-09-24 判明）
+
+`node_modules/` の最終更新時刻が `yarn.lock` と `package.json` と完全に一致する。
+
+```
+2026-08-25 22:55   node_modules/        （476 パッケージ）
+2026-08-25 22:55   yarn.lock
+2026-08-25 22:55   package.json
+2026-07-06 22:24   package-lock.json    ← fork 時点で凍結、以後未更新
+```
+
+3ファイルが同一時刻であることは、**同じ `yarn install` が3つすべてを書いた**ことを意味する。`package-lock.json` だけが2か月半前で止まっている。**yarn が実際に使われているパッケージマネージャと判断してよい根拠がこれで3点揃った**（git 追跡状況・ファイル更新日時・node_modules の同期）。
+
+この証拠も `install` を一度実行すれば失われる。1-3b の判断時は、まず Vercel ダッシュボードの Install Command を確認して4点目の裏取りをすること。
+
 ### なぜ問題か
 
 `yarn.lock` は `package.json` と**同一時刻**に更新されている一方、`package-lock.json` は fork した 7/6 から**停止している**。
@@ -355,15 +370,17 @@ uv --version
 
 cd backend
 
-# Python 3.13 を入れて固定する（.python-version が作られる）
+# ① pyproject.toml だけを作る
+uv init --bare
+
+# ② Python 3.13 を入れて固定する（.python-version が作られる）
 uv python install 3.13
 uv python pin 3.13
-
-# pyproject.toml だけを作る
-uv init --bare
 ```
 
 `--bare` は必須。付けないと `main.py` や `README.md` を生成して既存ファイルと衝突する。
+
+**順序も重要。** `uv init` は `.python-version` を自分で書くことがあるため、`pin` を先にやると上書きされうる。**init → pin の順**にして、最後に書いた値が残るようにする。
 
 ```bash
 # 依存を追加（uv.lock が生成される）
@@ -387,17 +404,45 @@ uv add fastapi google-genai pydantic python-dotenv requests uvicorn
 
 `.env` は `backend/` 直下にあるので、`uv run` も `backend/` で実行する。
 
+### ⚠️ pyenv との `.python-version` 衝突（2026-09-24 判明）
+
+このマシンの `.zshrc` には Python のバージョン管理ツールが3つ入っている。
+
+| 行 | ツール |
+|---|---|
+| `.zshrc:4` | conda（anaconda3） |
+| `.zshrc:17` | pyenv |
+| `.zshrc:26` | uv |
+
+**pyenv と uv は同じファイル名 `.python-version` を読む。** `uv python pin 3.13` を実行すると、`backend/` で素の `python` / `python3` を叩いたときに pyenv が反応してこうなる。
+
+```
+pyenv: version `3.13' is not installed
+```
+
+uv が入れた Python 3.13 は `~/.local/share/uv/python/` にあり、pyenv はそこを見ないため。**これは故障ではなく、2つのツールが同じファイルを別の意味で解釈しているだけ。**
+
+**対処：`uv run` 経由でしか Python を呼ばない。** `uv run python`, `uv run uvicorn main:app --reload` を使い、素の `python` を `backend/` で叩かない。uv の標準的な使い方そのままなので追加コストはない。
+
+pyenv / conda の整理（uv 一本化）は筋が通っているが、**段階4の通過後に別タスクとして行う。** 移行中にやると「uv が動かない」のか「pyenv を消した副作用」なのか切り分けられなくなる。
+
 **関門①で落ちた場合**：原因が Python 3.13 なら `uv python pin 3.12` に下げて再試行する。3.12 のサポート期限は 2028年なので、EOL 問題は解決したまま後退できる。
 
 ---
 
 ### 段階2：`.python-version` だけを push（Python 3.13 を単独で検証）
 
+> **⚠️ 訂正（2026-09-24）：フィーチャーブランチは使わない。**
+> Render は追跡ブランチ（`main`）しかデプロイしないため、ブランチに push しても
+> 本番で検証できない。段階2の目的（Python 3.13 を本番で単独検証する）が
+> 達成できないので、**`main` に段階ごとに直接コミットする**。
+> ブランチの代わりに「1コミット＝1変更」が安全装置になる（`git revert` 1回で戻せる）。
+
 ```bash
-git switch -c chore/migrate-to-uv
 git add backend/.python-version
 git status --short          # このファイルだけが緑か確認
 git commit -m "chore: Python のバージョンを 3.13 に固定"
+git push origin main        # ← Render の自動デプロイが走る
 ```
 
 Render の Root Directory が `backend` なので `backend/.python-version` がサービスのルートとして読まれる。**Build Command は `pip install -r requirements.txt` のままなので、依存の解決方法は変わらず、Python のバージョンだけが変わる。**
