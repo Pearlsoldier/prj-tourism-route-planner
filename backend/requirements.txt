@@ -1,8 +1,0 @@
-fastapi
-protobuf
-pydantic
-python-dotenv
-Requests
-uvicorn
-google-genai
-asyncpg
