@@ -563,6 +563,53 @@ Render ダッシュボード → 該当サービス → Settings で2箇所を�
 
 ---
 
+### 関門③の実測結果（2026-09-24）
+
+`uv sync --frozen` でのビルドが成功。**三者完全一致**を達成した。
+
+```
+ローカル .venv (31個)  ≡  uv.lock (31個)  ≡  本番 (31個)
+差分ゼロ。asyncpg / protobuf はすべてから消滅。
+```
+
+| | 移行前 | 移行後 |
+|---|---|---|
+| Python | ローカル 3.10.3 / 本番 不明 | **両方 3.13.15** |
+| 依存のバージョン | 固定なし・推移的依存26個は記録すらされない | **31個すべて記録・完全一致** |
+| 余分なパッケージ | 本番のみ `asyncpg`, `protobuf` | **なし** |
+
+速度：`Prepared 31 packages in 221ms` / `Installed 31 packages in 20ms` / `Bytecode compiled 1463 files in 1.03s`。最後の行は uv がバイトコードを事前コンパイルしている（pip はデフォルトで行わない）ため、初回リクエストの応答が速くなる。
+
+#### 🔴 発見①：uv 自体のバージョンが固定されていない（未対応）
+
+```
+Render:   Using uv version 0.10.2 (default)
+ローカル:  uv 0.12.18
+```
+
+**依存を固定する道具が固定されていない。** 今回は 0.10.2 が 0.12.18 の書いた `uv.lock` を読めたため動作したが、`uv.lock` にはフォーマットのバージョンがあり、将来ローカルの uv を上げると Render 側が読めなくなる可能性がある。壊れるのは本番のビルド。
+
+対処：Render の環境変数 `UV_VERSION` でローカルと同じ版に固定する（`render.com/docs/uv-version`）。
+
+**段階5の完了後に、独立した小変更として行う。** 移行中に変更を積み増すと原因の切り分けができなくなるため。
+
+#### 🟡 発見②：`VIRTUAL_ENV` の警告は `uv run` が必須である理由
+
+```
+warning: VIRTUAL_ENV=/opt/render/project/src/.venv does not match
+         the project environment path `.venv` and will be ignored
+```
+
+Render はリポジトリルート（`src/`）の `.venv` を想定して環境変数を立てるが、プロジェクトは `src/backend/` にあるため uv は `backend/.venv` を作り、環境変数を無視した。
+
+**Start Command を素の `uvicorn main:app ...` にしていた場合、存在しない `src/.venv` を探して失敗していた可能性がある。** `uv run` は作法ではなく、このズレを吸収する役割を担っている。
+
+#### 注意：ビルド成功 ≠ 起動成功
+
+ビルドログが `Build successful` で終わっても、Start Command の検証は済んでいない。サービスが Live になり、本番で会話が1往復できることを確認するまで関門③は通過ではない。
+
+---
+
 ### 段階5：`requirements.txt` を削除する
 
 関門③を通過してから実行する。
