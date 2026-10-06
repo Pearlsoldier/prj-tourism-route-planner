@@ -6,17 +6,32 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 AIとの対話で観光地を探し、徒歩ルートを組み立てるWebアプリ（SPA）。フロントエンドはBetterChatGPTのForkで、バックエンドはFastAPI + Gemini APIのFunction Callingを使う。
 
+## ドキュメントの所在
+
+作業を始める前に次の2つを読む。
+
+| ファイル | 内容 |
+|---|---|
+| `docs/plan-v1.0.0.md` | v1.0.0 までの4週計画。タスク一覧・進捗・付録（調査結果と手順） |
+| `docs/adr/` | 設計判断の記録（なぜそう決めたか、何を諦めたか） |
+
+`notes/` は個人的な学習メモ（gitignore 済み）。読む必要はない。
+
 ## 開発コマンド
 
 ### バックエンド（`backend/` ディレクトリ）
 
 ```bash
 cd backend
-source venv/bin/activate
-uvicorn main:app --reload
+uv run uvicorn main:app --reload
 ```
 
-起動後、`http://localhost:8000` で動作。
+起動後、`http://localhost:8000` で動作。`uv run` が `.venv` を自動で有効化するので
+`activate` は不要（2026-09-27 に uv へ移行、ADR-0002）。
+
+依存の追加は `uv add <パッケージ>`（開発用は `uv add --dev`）。`pyproject.toml` と
+`uv.lock` の両方が更新される。**`pip install` は使わない**（`uv.lock` に反映されず、
+本番と差が出る）。
 
 ### フロントエンド（`frontend/` ディレクトリ）
 
@@ -25,6 +40,13 @@ cd frontend
 npm run dev    # 開発サーバー（http://localhost:5173）
 npm run build  # 本番ビルド
 ```
+
+**⚠️ `npm install` / `yarn install` を実行してはいけない。**
+`package-lock.json` と `yarn.lock` が両方存在する未解決の問題がある（タスク 1-3b）。
+どちらを実行しても対応する lock ファイルが書き換わり、「実際にどちらのパッケージ
+マネージャが使われてきたか」を示す証拠（ファイルの更新時刻）が失われる。これは
+復元できない。判断が済むまで実行前に必ず確認を取る。詳細は
+`docs/plan-v1.0.0.md` の付録C。
 
 
 テストスクリプト（`backend/test.py` など）は単体で `python test.py` で実行できる探索的なスクリプト。正式なテストスイートはない。
@@ -108,6 +130,7 @@ BetterChatGPT の Fork。エンドポイント設定画面（SettingsMenu）で�
 - 1コミット＝そのコミットに巻き戻してアプリが動く単位
 - main への push は Render の自動デプロイが走る。push は必ず確認を取る
 - Google Maps API を実際に叩くスクリプトは課金が発生する。実行前に確認を取る
+- `frontend/` で `npm install` / `yarn install` は実行しない（証拠が不可逆に消える。タスク 1-3b が済むまで）
 
 ## ハマりどころ
 
