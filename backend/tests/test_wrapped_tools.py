@@ -1,6 +1,6 @@
 import pytest
 
-from functions.wrapped_tools import _add_minutes
+from functions.wrapped_tools import _add_minutes, _distance_km
 
 
 @pytest.mark.parametrize("hhmm, minutes, expected", [
@@ -15,3 +15,6 @@ def test_add_minutes(hhmm, minutes, expected):
 
 # 24時間（1440分）以上は対象外。呼び出し元（build_route）が足すのは
 # 徒歩1区間か滞在時間のみで、1回あたり最大でも数十分程度のため。
+
+def test_distance_km():
+    assert _distance_km(35.681236, 139.767125, 35.465800, 139.622300) == pytest.approx(27.3, rel=0.01)
