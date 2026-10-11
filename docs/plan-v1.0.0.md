@@ -64,7 +64,7 @@
 | 1-2 | ~~**uv へ移行**（`pyproject.toml` + `uv.lock`、Python 3.13 固定、`protobuf`/`asyncpg` 除去、Render のビルド設定切り替え）→ 詳細は付録D~~ **✅ 完了 2026-09-27**（達成条件 8/8） | 片付け | `main`（段階ごとに直接コミット） |
 | 1-3 | `timeline.py`・`timeline.py.bak` の処分、スパイク2本の扱い決定、fork由来の `deploy.yml` 削除、マージ済みブランチ整理 | 片付け | `chore/housekeeping` |
 | 1-3b | **フロントの lock ファイル二重問題を解消**（npm / yarn のどちらを正とするか決め、負けた方の lock を削除）→ 詳細は付録C | 片付け | `chore/housekeeping` |
-| 1-4 | pytest 導入＋純粋関数テスト3本 | テスト | `test/pure-functions` |
+| 1-4 | ~~pytest 導入＋純粋関数テスト3本~~ **✅ 完了 2026-10-11**（3関数に対しテスト関数5本、`9 passed`。`_distance_km` の「同一地点なら 0」は未テスト） | テスト | `test/pure-functions` |
 | 1-5 | レスポンスに `plan` を追加（バックエンド→フロント、store に入れるまで） | 実装 | `feature/plan-payload` |
 | 1-6 | ADR-0001 を書く（しおりデータをチャットレスポンスに同梱する決定と理由） | 記録 | 1-5 と同じ |
 | 1-7 | CLAUDE.md・要件定義書 v2.0 を実態に合わせる | 記録 | `docs/update-v2` |
@@ -101,7 +101,11 @@
 ```bash
 test ! -f backend/requirements.txt               # → 終了コード 0（uv へ移行済み）
 grep -c '^name = ' backend/uv.lock                # → 32（31依存 + backend 自身）
-cd backend && pytest -q                          # → "3 passed"
+cd backend && uv run pytest -q                   # → failed 0（2026-10-11 時点で "9 passed"）
+grep -c '^def test_' backend/tests/test_wrapped_tools.py   # → 5（3関数を対象にテスト関数5本）
+cd backend && uv run pytest --collect-only | grep -c 'test_gemini\|test_plases'   # → 0（実APIを叩く探索スクリプトを収集しない）
+cd backend && uv run pytest --collect-only | grep 'testpaths'   # → "testpaths: tests"
+uv run --project backend python -c "import tomllib;print(sum('pytest' in x for x in tomllib.load(open('backend/pyproject.toml','rb'))['project']['dependencies']))"   # → 0（pytest は dev グループのみ）
 curl -s -X POST localhost:8000/v1/chat/completions \
   -H "Authorization: Bearer $ACCESS_KEY_OWNER" -H "Content-Type: application/json" \
   -d '{"messages":[{"role":"user","content":"鎌倉を3時間観光したい"}]}' \
