@@ -1,6 +1,6 @@
 import pytest
 
-from functions.wrapped_tools import _add_minutes, _distance_km
+from functions.wrapped_tools import _add_minutes, _distance_km, _dedupe_by_area
 
 
 @pytest.mark.parametrize("hhmm, minutes, expected", [
@@ -18,3 +18,26 @@ def test_add_minutes(hhmm, minutes, expected):
 
 def test_distance_km():
     assert _distance_km(35.681236, 139.767125, 35.465800, 139.622300) == pytest.approx(27.3, rel=0.01)
+
+def test_dedupe_by_area():
+    a = {"name": "A", "lat": 35.681236, "lng": 139.767125, "user_rating_count": 100}
+    b = {"name": "B", "lat": 35.683236, "lng": 139.767125, "user_rating_count": 500}
+    c = {"name": "C", "lat": 35.685236, "lng": 139.767125, "user_rating_count": 300}   # aから445m（外側）
+    d = {"name": "D", "lat": 35.683836, "lng": 139.767125, "user_rating_count": 300}   # aから289m（境界の内側）
+    e = {"name": "E", "lat": 35.684036, "lng": 139.767125, "user_rating_count": 300}   # aから311m（境界の外側）
+
+    assert _dedupe_by_area([a,b]) == [b]
+    assert _dedupe_by_area([a,c]) == [a, c]
+    assert _dedupe_by_area([a,d]) == [d]
+    assert _dedupe_by_area([a,e]) == [a, e]
+
+def test_tie_keeps_first():
+    a = {"name": "A", "lat": 35.681236, "lng": 139.767125, "user_rating_count": 200}
+    b = {"name": "B", "lat": 35.681236, "lng": 139.767125, "user_rating_count": 200}
+    assert _dedupe_by_area([a,b]) == [a]
+
+def test_preserves_original_order():
+    a = {"name": "A", "lat": 35.681236, "lng": 139.767125, "user_rating_count": 100}
+    b = {"name": "B", "lat": 35.683236, "lng": 139.767125, "user_rating_count": 500}
+    c = {"name": "C", "lat": 35.685236, "lng": 139.767125, "user_rating_count": 300}   # aから445m（外側）
+    assert _dedupe_by_area([a, c,b]) == [c,b]
