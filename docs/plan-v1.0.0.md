@@ -39,7 +39,7 @@
 |---|---|---|
 | 1 | 従来どおり会話でルートが組める（退行なし） | 手動での通し確認 |
 | 2 | 左右分割画面で、右側に地図が表示される | 目視 |
-| 3 | ルート確定時、全地点に訪問順の番号付きピンが立つ | ピン数 == `jq '.plan.stops \| length'` |
+| 3 | ルート確定時、全訪問先に訪問順の番号付きピンが立ち、起点には別の印が立つ | 番号付きピン数 == `jq '.plan.visits \| length'`（形は ADR-0001） |
 | 4 | 全ピンが収まるよう表示範囲が自動調整される | 目視 |
 | 5 | `pytest -q` が通る | exit 0 |
 | 6 | `npm run build` が通る | exit 0 |
@@ -109,7 +109,7 @@ uv run --project backend python -c "import tomllib;print(sum('pytest' in x for x
 curl -s -X POST localhost:8000/v1/chat/completions \
   -H "Authorization: Bearer $ACCESS_KEY_OWNER" -H "Content-Type: application/json" \
   -d '{"messages":[{"role":"user","content":"鎌倉を3時間観光したい"}]}' \
-  | jq '.plan.stops | length'                    # → 2 以上
+  | jq '.plan.visits | length'                   # → 1 以上（課金あり。実行前に確認）
 ls docs/adr/                                     # → 0001-*.md が存在
 ```
 
@@ -142,7 +142,7 @@ ls docs/adr/                                     # → 0001-*.md が存在
 | # | タスク | ブランチ |
 |---|---|---|
 | 2-1 | `App.tsx` を flex row 化、`MapPanel` コンポーネント新規作成 | `feature/split-layout` |
-| 2-2 | 右パネルに `plan.stops` の名前を訪問順に並べる（地図はまだ無し） | 同上 |
+| 2-2 | 右パネルに `plan.origin` と `plan.visits` の名前を訪問順に並べる（地図はまだ無し） | 同上 |
 | 2-3 | GitHub Actions：push で `pytest -q` と `npm run build` を実行 | `chore/ci` |
 
 `App.tsx:77-84` の外側 div を flex row にして `<Chat />` の横に `<MapPanel />` を並べる。`Chat` は既に `flex-1` なので、`Chat.tsx` と `ChatContent.tsx` は触らずに済む見込み。
@@ -168,7 +168,7 @@ gh run list --limit 1                            # → success
 |---|---|---|
 | 3-1 | フロント用 Google Maps APIキーを新規発行＋HTTPリファラ制限 | （設定のみ） |
 | 3-2 | `@vis.gl/react-google-maps` 導入、地図描画 | `feature/map-panel` |
-| 3-3 | `stops` を訪問順の番号付きマーカーで配置 | 同上 |
+| 3-3 | `visits` を訪問順の番号付きマーカーで、`origin` を別の印で配置 | 同上 |
 | 3-4 | 全ピンが収まるよう表示範囲を自動調整 | 同上 |
 | 3-5 | ADR-0002 を書く（地図ライブラリの選定理由、Leaflet を採らなかった理由） | 同上 |
 
@@ -181,7 +181,7 @@ cd frontend && npm run build                     # exit 0
 cd backend && pytest -q                          # 退行なし
 ```
 
-＋ ピンの数が `jq '.plan.stops | length'` と一致
+＋ 番号付きピンの数が `jq '.plan.visits | length'` と一致
 
 ---
 
@@ -290,6 +290,7 @@ Instead, we recommend to use AFC in Chat.send_message.
 | 2026-09-27 | v1.4 | タスク 1-2 完了を記録／付録D に関門②③の実測結果と発見2件を追加 | uv 移行を段階1〜5すべて完了。ローカル `.venv`・`uv.lock`・本番の三者が31パッケージで完全一致し、`asyncpg`/`protobuf` が全環境から消滅した |
 | 2026-09-27 | v1.5 | Week 1 の棚卸し（推奨着手順序と根拠）を追加／達成条件から削除済み `requirements.txt` への参照を除去／CLAUDE.md の起動手順・`npm install` 禁止・ドキュメント所在を先行修正 | セッションを跨ぐ引き継ぎの整理。`CLAUDE.md` は毎セッション自動で読まれるため、`source venv/bin/activate` を残すと新しいセッションが存在しない venv を案内してしまう。棚卸し結果は会話にしか無かったため記録した |
 | 2026-10-11 | v1.6 | タスク 1-4 完了を記録（達成条件を `"3 passed"` からコマンドで判定できる5本に書き換え）／再計画（リリース日を 10/21 → 11/1 に移し、Must は維持。以降の割り当てを追加） | 約10日の中断で Week 1 の残り5タスクが未着手のまま暦が Week 3 に入り、10/21 までに Must を収めるのは現実的でなくなった。受け入れ条件の2〜4（地図・ピン・範囲調整）は v1.0.0 の中心のため、削らず日付を動かした |
+| 2026-10-11 | v1.7 | `plan` の形を ADR-0001 で決定し、受け入れ条件3・1-5 の達成条件・2-2・3-3 の `plan.stops` を `plan.visits`／`plan.origin` に書き換え | 起点は訪問先ではない（集まって出発する場所）ため `visits` から分けた。起点と訪問先が同じ場所でも表せるよう、場所と役割を別のオブジェクトにした |
 
 ---
 
