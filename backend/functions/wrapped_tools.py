@@ -12,7 +12,7 @@ import functools
 from models.guidebook import Guidebook
 print("[import] wrapped_tools を読み込み開始")
 
-def record_to_guidebook(plan: Guidebook, field: str, mode: str = "once"):
+def record_to_guidebook(guidebook: Guidebook, field: str, mode: str = "once"):
     """Guidebook に記録するデコレータ"""
     print(f"   [1層目] record_to_guidebook 実行 field={field} / mode={mode}")
 
@@ -27,12 +27,12 @@ def record_to_guidebook(plan: Guidebook, field: str, mode: str = "once"):
             if "error" in result:
                 print(f"   [3層目] スキップ（field={field} / エラー）")
             elif mode == "append":
-                if result not in getattr(plan, field):
-                    getattr(plan, field).append(result)
-                print(f"   [3層目] 追記（field={field} / 件数={len(getattr(plan, field))}）")
+                if result not in getattr(guidebook, field):
+                    getattr(guidebook, field).append(result)
+                print(f"   [3層目] 追記（field={field} / 件数={len(getattr(guidebook, field))}）")
             else:
-                if getattr(plan, field) is None:
-                    setattr(plan, field, result)
+                if getattr(guidebook, field) is None:
+                    setattr(guidebook, field, result)
                     print(f"   [3層目] 記録（field={field}）")
                 else:
                     print(f"   [3層目] スキップ（field={field} / 既存あり）")
@@ -43,7 +43,7 @@ def record_to_guidebook(plan: Guidebook, field: str, mode: str = "once"):
     return recorder
 
 
-def make_select_places(plan: Guidebook):
+def make_select_places(guidebook: Guidebook):
     def select_places(places: list[dict]) -> dict:
         """ユーザーが巡る観光地と順番を確定したら、この関数を呼び出す。
 
@@ -65,11 +65,12 @@ def make_select_places(plan: Guidebook):
         登録された巡り順のリストを含む辞書。
     """
         print(f"★ select_places が呼ばれました。 {places}")
-        plan.selected = places
+        guidebook.selected = places
         return {"selected": places}
     return select_places
 
-def make_set_start_time(plan: Guidebook):
+
+def make_set_start_time(guidebook: Guidebook):
     def set_start_time(start_time: str) -> dict:
         """ユーザーが観光の開始時刻を指定したら、この関数を呼び出す。
 
@@ -81,11 +82,12 @@ def make_set_start_time(plan: Guidebook):
         登録された開始時刻を含む辞書。
     """
         print(f"★ set_start_time が呼ばれました。 {start_time}")
-        plan.start_time = start_time
+        guidebook.start_time = start_time
         return {"start_time": start_time}
     return set_start_time
 
-def make_reorder_places(plan: Guidebook):
+
+def make_reorder_places(guidebook: Guidebook):
     def reorder_places(names: list[str]) -> dict:
         """ユーザーが巡る順番の変更を指示したら、この関数を呼び出す。
 
@@ -104,16 +106,16 @@ def make_reorder_places(plan: Guidebook):
         print(f"★ reorder_places が呼ばれました。 {names}")
 
         # 1. 並べ替えられる状態か（起点 + 2ヶ所以上）
-        if len(plan.selected) < 3:
+        if len(guidebook.selected) < 3:
             return {"error": "並べ替えの対象となる観光地が2ヶ所ありません。"}
 
-        origin = plan.selected[0]
-        others = plan.selected[1:]
+        origin = guidebook.selected[0]
+        others = guidebook.selected[1:]
 
         # 2. 起点が混ざっていたら黙って除く
         names = [n for n in names if n != origin["name"]]
 
-        # 3. 検証（plan にはまだ触らない）
+        # 3. 検証（guidebook にはまだ触らない）
         by_name = {place["name"]: place for place in others}
 
         unknown = [n for n in names if n not in by_name]
@@ -136,11 +138,11 @@ def make_reorder_places(plan: Guidebook):
             }
 
         # 4. 反映
-        plan.selected = [origin] + [by_name[n] for n in names]
-        plan.legs = []
+        guidebook.selected = [origin] + [by_name[n] for n in names]
+        guidebook.legs = []
 
-        print(f"★ 巡り順を変更しました。 {[p['name'] for p in plan.selected]}")
-        return {"selected": [p["name"] for p in plan.selected]}
+        print(f"★ 巡り順を変更しました。 {[p['name'] for p in guidebook.selected]}")
+        return {"selected": [p["name"] for p in guidebook.selected]}
 
     return reorder_places
 
@@ -283,11 +285,11 @@ def _dedupe_by_area(candidates: list[dict]) -> list[dict]:
 # 本体
 # ---------------------------------------------------------------
 
-def make_build_route(plan, fetch_details):
+def make_build_route(guidebook, fetch_details):
     """build_route を作って返す。
 
     Args:
-        plan: 記録先の Guidebook。
+        guidebook: 記録先の Guidebook。
         fetch_details: place_id を受け取って口コミ・要約を返す関数。
             main.py の fetch_details_cached を渡すこと。
             tools.get_place_details を直接渡すとキャッシュが効かず、
@@ -502,10 +504,10 @@ def make_build_route(plan, fetch_details):
                 stop["reviews"] = details.get("reviews")
 
         # --- しおりに記録する ---
-        plan.origin = stops[0]
-        plan.selected = stops
-        plan.legs = legs
-        plan.start_time = start_time
+        guidebook.origin = stops[0]
+        guidebook.selected = stops
+        guidebook.legs = legs
+        guidebook.start_time = start_time
 
         result = {
             "start_time": start_time,

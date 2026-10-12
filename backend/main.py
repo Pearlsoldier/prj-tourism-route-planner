@@ -97,11 +97,11 @@ async def chat_completions(request: ChatCompletionRequest, who: str = Depends(ve
     session_key = hashlib.sha256(user_messages[0].encode()).hexdigest()
     print(session_key)
 
-    plan = sessions.setdefault(session_key, Guidebook())
+    guidebook = sessions.setdefault(session_key, Guidebook())
     # Gemini に見せるツールは build_route ひとつだけ。
     # geocode や get_walking_leg を個別に登録すると、Gemini がそれらを
     # 単独で呼び始め、ルートの組み立てが会話の外に漏れる。
-    build_route = make_build_route(plan, fetch_details_cached)
+    build_route = make_build_route(guidebook, fetch_details_cached)
     contents = []
     for m in request.messages:
         if m.role == "system":
@@ -120,10 +120,10 @@ async def chat_completions(request: ChatCompletionRequest, who: str = Depends(ve
         contents=contents,
         config=types.GenerateContentConfig(
             tools=[build_route],
-            system_instruction=build_system_instruction(plan),
+            system_instruction=build_system_instruction(guidebook),
             ),
         )
-    print(plan, plan.missing_fields())
+    print(guidebook, guidebook.missing_fields())
 
     text = response.text
     if text is None:

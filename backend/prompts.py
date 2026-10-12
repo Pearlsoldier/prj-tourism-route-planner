@@ -118,7 +118,7 @@ BASE = """あなたは観光ナビゲーターです。ユーザーに4つの質
 """
 
 
-def build_system_instruction(plan: Guidebook) -> str:
+def build_system_instruction(guidebook: Guidebook) -> str:
     """現在のしおりの状態を埋め込んだ system_instruction を返す。
 
     Gemini に「取りに行かせる」のではなく、毎回こちらから渡す。
@@ -126,6 +126,6 @@ def build_system_instruction(plan: Guidebook) -> str:
     """
     return BASE + f"""
 【現在のしおり】
-{json.dumps(asdict(plan), ensure_ascii=False, indent=2)}
-不足している欄: {plan.missing_fields()}
+{json.dumps(asdict(guidebook), ensure_ascii=False, indent=2)}
+不足している欄: {guidebook.missing_fields()}
 """
