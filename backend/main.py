@@ -11,7 +11,7 @@ import hashlib
 from functions.wrapped_tools import make_build_route
 import functions.tools
 from prompts import build_system_instruction
-
+from functions.plan_payload import to_plan
 load_dotenv()
 
 api_key = os.environ.get("GEMINI_API_KEY")
@@ -126,6 +126,7 @@ async def chat_completions(request: ChatCompletionRequest, who: str = Depends(ve
     print(guidebook, guidebook.missing_fields())
 
     text = response.text
+    plan = to_plan(guidebook)
     if text is None:
         print("★ 応答テキストが空でした")
         text = ""
@@ -134,4 +135,6 @@ async def chat_completions(request: ChatCompletionRequest, who: str = Depends(ve
     # build_route が時刻まで確定させ、Gemini がそれを文章で案内するため、
     # 表を足すと同じ内容が二重に出る（2026-09-05 の判断）。
 
-    return {"choices": [{"message": {"content": text}}]}
+    return {"choices": [{"message": {"content": text}}],
+            "plan": plan
+            }
