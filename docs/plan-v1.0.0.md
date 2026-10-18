@@ -65,8 +65,8 @@
 | 1-3 | `timeline.py`・`timeline.py.bak` の処分、スパイク2本の扱い決定、fork由来の `deploy.yml` 削除、マージ済みブランチ整理 | 片付け | `chore/housekeeping` |
 | 1-3b | **フロントの lock ファイル二重問題を解消**（npm / yarn のどちらを正とするか決め、負けた方の lock を削除）→ 詳細は付録C | 片付け | `chore/housekeeping` |
 | 1-4 | ~~pytest 導入＋純粋関数テスト3本~~ **✅ 完了 2026-10-11**（3関数に対しテスト関数5本、`9 passed`。`_distance_km` の「同一地点なら 0」は未テスト） | テスト | `test/pure-functions` |
-| 1-5 | レスポンスに `plan` を追加（バックエンド→フロント、store に入れるまで） | 実装 | `feature/plan-payload` |
-| 1-6 | ADR-0001 を書く（しおりデータをチャットレスポンスに同梱する決定と理由） | 記録 | 1-5 と同じ |
+| 1-5 | レスポンスに `plan` を追加（バックエンド→フロント、store に入れるまで）**🔶 バックエンド完了 2026-10-18**（`b72b314` `to_plan`＋テスト3本・`12 passed`／`c4f6b89` 応答に同梱、実リクエストで `plan: null` と `plan.keys = [origin, visits]` を確認）。残りはフロントの `plan-slice` | 実装 | `feature/plan-payload` |
+| 1-6 | ~~ADR-0001 を書く（しおりデータをチャットレスポンスに同梱する決定と理由）~~ **✅ 完了 2026-10-11**（Accepted。1-5 の設計と並行して記録、`59efc42`・`72cdfb1`） | 記録 | 1-5 と同じ |
 | 1-7 | CLAUDE.md・要件定義書 v2.0 を実態に合わせる | 記録 | `docs/update-v2` |
 
 #### Week 1 の棚卸し（2026-09-27）
