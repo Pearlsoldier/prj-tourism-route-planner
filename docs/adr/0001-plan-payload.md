@@ -123,6 +123,14 @@ Accepted（2026-10-11）
 - `Guidebook` の形は v1.0.0 では変えない。AI の作業メモとしての役割があり、変えると `build_route` とプロンプトに影響が広がる
 - `Guidebook` から `plan` を作る**純粋関数**を一つ用意し、レスポンスを返す直前に呼ぶ。外部 API を呼ばないので、`tests/test_wrapped_tools.py` と同じ流れでテストできる
 - 対応関係：`origin` ← `selected[0]`、`visits[i]` ← `selected[i+1]` と `legs[i]`、`mode` は定数 `"walk"`
+- 関数は計算をしない。時刻は `build_route` が計算済みなので、項目を選んで詰め替えるだけ
+- **置き場所は新しいファイル `functions/plan_payload.py`**（`def to_plan(guidebook: Guidebook) -> dict | None`）。`Guidebook` のメソッドにはしない
+  - `Guidebook` は AI がしおりを作るための道具で、今あるメソッド（`missing_fields`・`is_ready`）はどちらも AI のためのもの。地図やブラウザに出すための変換は別の仕事なので外に置く
+  - `to_plan` を直すことになるのはフロントの都合（地図に住所を出したい、経路線を足したい等）が変わったとき。メソッドにすると、AI と関係のない理由で `Guidebook` を書き換えることになる
+  - `main.py` の中に置かないのは、テストで import すると Gemini クライアントの生成と `.env` の読み込みまで走るため
+- **`legs` の数が `selected` − 1 と合わないときは `None` を返し、`print("★ …")` でログに残す**
+  - `build_route` しか `Guidebook` を書かない現状では起きないはず。ただし `zip` は短い方に合わせて黙って切り捨てるので、何もしないと地点が欠けたしおりが正しそうに返る
+  - 例外を投げる案は不採用。地図のための不整合で、チャットの文章まで返らなくなる（500 エラー）
 - フロントで `plan` を slice に入れる処理は `handleSubmit` の中（`useSubmit.ts:70` の直後）にだけ置く。タイトル生成（`useSubmit.ts:27` の `generateTitle`）も同じエンドポイントを叩くため、その応答の `"plan": null` で上書きしないようにする
 
 ## 結果

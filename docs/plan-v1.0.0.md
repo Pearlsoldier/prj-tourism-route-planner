@@ -254,6 +254,7 @@ cat CHANGELOG.md                                 # v1.0.0 の内容が記載さ�
 | v1.2.0 想定 | 認証の作り替え（Google OAuth の自作 → 余力があればパスキー） |
 | 未定 | しおりの永続化、地図の双方向操作、車・公共交通機関 |
 | 未定 | **Gemini 呼び出しを `Models.generate_content` から `Chat.send_message` に移す**（下記参照。ADR が必要） |
+| 未定 | **`Guidebook` の `selected`・`legs` の1件をクラス（`Stop`・`Leg`）にする**（下記参照。ADR-0001 の改訂が必要） |
 
 ### 保留中の技術的負債：AFC 非推奨警告（2026-09-24 発見）
 
@@ -276,6 +277,28 @@ Instead, we recommend to use AFC in Chat.send_message.
 - セッション管理の設計判断を含むため、**ADR を書くべき変更**。勢いでやる作業ではない
 
 着手する際の前提：`build_route` のモックテスト（v1.1.0 の先頭項目）が先に必要。テストなしでリクエスト処理の構造を変えると、壊れたことに気づけない。
+
+### 保留中のリファクタリング：`Guidebook` の中身をクラスにする（2026-10-12 メモ）
+
+**きっかけ：** 1-5 で `to_plan` の入力を調べたとき、`selected`・`legs` の1件にどんなキーがあるかが、`build_route` の中の辞書リテラル（`stops = [{...}]`・`stops.append({...})`・`legs.append({...})`）を読まないと分からなかった。`Guidebook` には `selected: list[dict]` としか書かれておらず、中身の形がどこにも宣言されていない。
+
+**やりたいこと（ユーザーの希望。`to_plan` が動くのを確認した後、Claude が修正する）：**
+`Stop`・`Leg` をクラス（dataclass）にし、`stop["name"]` を `stop.name` で読めるようにする。`models/guidebook.py` を見ればキーが分かる状態にする。
+
+**検討した3案（2026-10-12）：**
+
+| 案 | 内容 | 規模 |
+|---|---|---|
+| A | 変えない。`to_plan` の docstring にキーを書く | 数行 |
+| B | `TypedDict` で `Stop`・`Leg` の型を宣言する。動作は変わらない | 20〜30行 |
+| **C（希望）** | `Stop`・`Leg` をクラスにする | `build_route`・`reorder_places`・`prompts.py`（`asdict`）・`to_plan` に波及 |
+
+**着手前に確認すること：**
+
+- ADR-0001 の「実装の方針」に「`Guidebook` の形は v1.0.0 では変えない」とある。C はこれに反するので、ADR-0001 を改訂するか、新しい ADR を書く
+- `build_route` にはテストがない（モックテストは v1.1.0 の先頭項目）。辞書をクラスに変えると、`stop["name"]` の書き換え漏れは `build_route` が Gemini から呼ばれた瞬間にしか分からない。`uvx ruff check` では検出できない（辞書の添字アクセスは型を見ないため）
+- `prompts.py` は `asdict(guidebook)` でプロンプトに JSON を埋め込んでいる。中身を dataclass にしても `asdict` は入れ子を辞書に変換するので、AI に見える形は変わらないはず。着手時に確かめる
+- `to_plan` の小さな関数（`_place`・`_travel`・`_visit`）は、引数の読み方が `stop["name"]` → `stop.name` に変わるだけで済むはず
 
 ---
 

@@ -83,6 +83,20 @@ AIが情報を集めながら埋めていく「旅のしおり」のデータク
 
 `is_ready()` が True になったタイミングで timeline.py がプランのMarkdown表を生成し、Geminiの応答に付加する。
 
+### しおりの3つの役割（ADR-0001）
+
+しおりに関わるコードは、**誰の都合で変わるか**で置き場所を分ける。
+
+```
+AI がしおりを作る          → Guidebook       （backend/models/guidebook.py）
+地図に出せる形に詰め替える → to_plan         （backend/functions/plan_payload.py）
+地図を描く                 → フロントの部品  （Week 3）
+```
+
+- `Guidebook` に置くのは AI のためのものだけ（`missing_fields`・`is_ready` など）。地図やブラウザのための変換を `Guidebook` のメソッドにしない
+- `to_plan` は計算をしない。`build_route` が計算した値を選んで詰め替えるだけ
+- 詰め替えた形（`plan`）と、その理由は `docs/adr/0001-plan-payload.md`
+
 ### Geminiへ渡すツール
 
 Geminiに登録されるツール（Function Calling で呼ばれる）:
