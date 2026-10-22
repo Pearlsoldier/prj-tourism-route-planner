@@ -18,6 +18,7 @@ const useSubmit = () => {
   const generating = useStore((state) => state.generating);
   const currentChatIndex = useStore((state) => state.currentChatIndex);
   const setChats = useStore((state) => state.setChats);
+  const setPlan = useStore((state) => state.setPlan);
 
   const generateTitle = async (
     message: MessageInterface[]
@@ -61,6 +62,8 @@ const useSubmit = () => {
       );
       if (messages.length === 0) throw new Error('Message exceed max token!');
 
+      // 応答を待つ間に別のチャットへ切り替えられても、送った側のチャットに plan を入れる
+      const chatId = chats[currentChatIndex].id;
       const data = await getChatCompletion(
         defaultAPIEndpoint,
         messages,
@@ -75,6 +78,7 @@ const useSubmit = () => {
         updatedMessages[updatedMessages.length - 1].content =
           data.choices[0].message.content;
         setChats(updatedChats);
+        setPlan(chatId, data.plan ?? null);
       }
 
       // update tokens used in chatting
