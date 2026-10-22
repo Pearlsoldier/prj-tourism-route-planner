@@ -151,6 +151,9 @@ BetterChatGPT の Fork。エンドポイント設定画面（SettingsMenu）で�
 - `.env` は `backend/` 直下。`load_dotenv()` は上へしか遡らないので、
   リポジトリのルートから実行すると読めない
 - `uvicorn --reload` は親子2プロセスになる。`lsof -i :8000` で両方の PID を確認して落とす。
-  `kill` が無視されることがあり、`Errno 48` はコードの問題ではない
+  `kill` が無視されることがあり、`Errno 48` はコードの問題ではない。
+  `ps -o pid,stat -p <PID>` の `STAT` が `T` なら、Ctrl+C ではなく Ctrl+Z で一時停止している
+  （ポートを握ったまま応答もせず、普通の `kill` は保留される）。そのターミナルで `fg` → Ctrl+C、
+  見つからなければ `kill -9 <親PID> <子PID>`
 - ツールの戻り値の型が統一されていない。`search_nearby_location` だけリストを返すため
   `"error" in result` が効かない
