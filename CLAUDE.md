@@ -37,16 +37,16 @@ uv run uvicorn main:app --reload
 
 ```bash
 cd frontend
-npm run dev    # 開発サーバー（http://localhost:5173）
-npm run build  # 本番ビルド
+yarn dev       # 開発サーバー（http://localhost:5173）
+yarn build     # 本番ビルド
+yarn install --frozen-lockfile   # yarn.lock どおりに入れる（yarn.lock を書き換えない）
 ```
 
-**⚠️ `npm install` / `yarn install` を実行してはいけない。**
-`package-lock.json` と `yarn.lock` が両方存在する未解決の問題がある（タスク 1-3b）。
-どちらを実行しても対応する lock ファイルが書き換わり、「実際にどちらのパッケージ
-マネージャが使われてきたか」を示す証拠（ファイルの更新時刻）が失われる。これは
-復元できない。判断が済むまで実行前に必ず確認を取る。詳細は
-`docs/plan-v1.0.0.md` の付録C。
+パッケージマネージャは **yarn**（v1）。本番の Vercel も `yarn install` → `yarn run build` で
+動いている（2026-10-26 にビルドログで確認、タスク 1-3b）。依存の追加は `yarn add <パッケージ>`
+（開発用は `yarn add --dev`）。`package.json` と `yarn.lock` の両方が更新される。
+**`npm install` は使わない**（`package-lock.json` が生まれ、lock が2つに割れて本番と差が出る）。
+経緯は `docs/plan-v1.0.0.md` の付録C。
 
 
 テストスクリプト（`backend/test.py` など）は単体で `python test.py` で実行できる探索的なスクリプト。正式なテストスイートはない。
@@ -127,7 +127,7 @@ BetterChatGPT の Fork。エンドポイント設定画面（SettingsMenu）で�
 
 パスエイリアスは `vite.config.ts` で定義（`@components/`, `@store/`, `@hooks/` など）。
 
-フロントエンドはVercel（Static）でホスティング、バックエンドはRenderでホスティング。`frontend/middleware.ts`（Vercel Routing Middleware）でサイト全体にBasic認証をかけている。資格情報はVercelプロジェクトの環境変数 `BASIC_AUTH_USER` / `BASIC_AUTH_PASSWORD` に設定する（未設定だと全リクエストが500になる、fail-close）。ローカルの `npm run dev` / `vite build` では実行されず、Vercel上でのみ動作する。
+フロントエンドはVercel（Static）でホスティング、バックエンドはRenderでホスティング。`frontend/middleware.ts`（Vercel Routing Middleware）でサイト全体にBasic認証をかけている。資格情報はVercelプロジェクトの環境変数 `BASIC_AUTH_USER` / `BASIC_AUTH_PASSWORD` に設定する（未設定だと全リクエストが500になる、fail-close）。ローカルの `yarn dev` / `yarn build` では実行されず、Vercel上でのみ動作する。
 
 ## 主要な設計上の注意点
 
@@ -144,7 +144,7 @@ BetterChatGPT の Fork。エンドポイント設定画面（SettingsMenu）で�
 - 1コミット＝そのコミットに巻き戻してアプリが動く単位
 - main への push は Render の自動デプロイが走る。push は必ず確認を取る
 - Google Maps API を実際に叩くスクリプトは課金が発生する。実行前に確認を取る
-- `frontend/` で `npm install` / `yarn install` は実行しない（証拠が不可逆に消える。タスク 1-3b が済むまで）
+- `frontend/` で `npm install` は使わない。依存の追加は `yarn add`
 
 ## ハマりどころ
 
