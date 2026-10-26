@@ -141,8 +141,8 @@ ls docs/adr/                                     # → 0001-*.md が存在
 
 | # | タスク | ブランチ |
 |---|---|---|
-| 2-1 | `App.tsx` を flex row 化、`MapPanel` コンポーネント新規作成 | `feature/split-layout` |
-| 2-2 | 右パネルに `plan.origin` と `plan.visits` の名前を訪問順に並べる（地図はまだ無し） | 同上 |
+| 2-1 | ~~`App.tsx` を flex row 化、`MapPanel` コンポーネント新規作成~~ **✅ 完了 2026-10-27**（右パネル幅 40%、md 未満では非表示。HTML モックで見た目を確認してから実装） | `feature/split-layout` |
+| 2-2 | ~~右パネルに `plan.origin` と `plan.visits` の名前を訪問順に並べる（地図はまだ無し）~~ **✅ 完了 2026-10-27**（S＋番号の印、時刻・徒歩の時間と距離も表示。ローカルで1往復し5か所のリストを確認） | 同上 |
 | 2-3 | GitHub Actions：push で `pytest -q` と `npm run build` を実行 | `chore/ci` |
 
 `App.tsx:77-84` の外側 div を flex row にして `<Chat />` の横に `<MapPanel />` を並べる。`Chat` は既に `flex-1` なので、`Chat.tsx` と `ChatContent.tsx` は触らずに済む見込み。
@@ -317,6 +317,7 @@ Instead, we recommend to use AFC in Chat.send_message.
 | 2026-10-22 | v1.8 | タスク 1-5 完了を記録（フロントの `plan-slice` を追加） | 1-5 が終わったら再計画する合意（10/18）の起点にするため |
 | 2026-10-26 | v1.9 | タスク 1-3b 完了を記録（yarn を採用、付録Cに結果を追加） | Vercel のビルドログで本番が yarn と確認でき、判断材料が揃った |
 | 2026-10-26 | v1.10 | タスク 3-1 完了を記録 | フロント用キーの発行と制限が済み、3-2 の前提が揃った |
+| 2026-10-27 | v1.11 | タスク 2-1・2-2 完了を記録 | 左右分割と名前リストが動いた |
 
 ---
 
