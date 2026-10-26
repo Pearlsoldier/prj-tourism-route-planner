@@ -166,7 +166,7 @@ gh run list --limit 1                            # → success
 
 | # | タスク | ブランチ |
 |---|---|---|
-| 3-1 | フロント用 Google Maps APIキーを新規発行＋HTTPリファラ制限 | （設定のみ） |
+| 3-1 | ~~フロント用 Google Maps APIキーを新規発行＋HTTPリファラ制限~~ **✅ 完了 2026-10-26**（Maps JavaScript API を有効化。リファラは `http://localhost:5173/*` と `https://prj-tourism-route-planner.vercel.app/*`、API は Maps JavaScript API のみ。変数名 `VITE_GOOGLE_MAPS_API_KEY` を `frontend/.env` と Vercel（Production、Config 型）に登録。このキーで Geocoding を叩くと `REQUEST_DENIED` になることを curl で確認） | （設定のみ） |
 | 3-2 | `@vis.gl/react-google-maps` 導入、地図描画 | `feature/map-panel` |
 | 3-3 | `visits` を訪問順の番号付きマーカーで、`origin` を別の印で配置 | 同上 |
 | 3-4 | 全ピンが収まるよう表示範囲を自動調整 | 同上 |
@@ -316,6 +316,7 @@ Instead, we recommend to use AFC in Chat.send_message.
 | 2026-10-11 | v1.7 | `plan` の形を ADR-0001 で決定し、受け入れ条件3・1-5 の達成条件・2-2・3-3 の `plan.stops` を `plan.visits`／`plan.origin` に書き換え | 起点は訪問先ではない（集まって出発する場所）ため `visits` から分けた。起点と訪問先が同じ場所でも表せるよう、場所と役割を別のオブジェクトにした |
 | 2026-10-22 | v1.8 | タスク 1-5 完了を記録（フロントの `plan-slice` を追加） | 1-5 が終わったら再計画する合意（10/18）の起点にするため |
 | 2026-10-26 | v1.9 | タスク 1-3b 完了を記録（yarn を採用、付録Cに結果を追加） | Vercel のビルドログで本番が yarn と確認でき、判断材料が揃った |
+| 2026-10-26 | v1.10 | タスク 3-1 完了を記録 | フロント用キーの発行と制限が済み、3-2 の前提が揃った |
 
 ---
 
