@@ -1,11 +1,26 @@
 import React from 'react';
-import { APIProvider, Map as GoogleMap } from '@vis.gl/react-google-maps';
+import {
+  APIProvider,
+  AdvancedMarker,
+  ColorScheme,
+  Map as GoogleMap,
+  Pin,
+} from '@vis.gl/react-google-maps';
 import useStore from '@store/store';
 import { Plan } from '@type/plan';
 
 // 3-1 で作ったフロント用のキー。ビルド成果物に埋め込まれる前提で、
 // Google Cloud 側でリファラと Maps JavaScript API のみに制限している
 const mapsApiKey: string | undefined = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+
+// 番号付きのピン（AdvancedMarker）にはマップ ID が要る。
+// 未設定なら Google が開発用に用意している DEMO_MAP_ID を使う
+const mapId: string =
+  import.meta.env.VITE_GOOGLE_MAPS_MAP_ID || 'DEMO_MAP_ID';
+
+// ピンの色。右のリストの印（bg-blue-600 / bg-red-600）と揃える
+const ORIGIN_COLOR = { background: '#2563eb', borderColor: '#1e40af' };
+const VISIT_COLOR = { background: '#dc2626', borderColor: '#991b1b' };
 
 // チャットの右に置くパネル。Week 3 で地図が入る。
 // スマホ（md 未満）では出さない。
@@ -30,22 +45,40 @@ const MapPanel = () => {
   );
 };
 
-// 出発地を中心に地図を出す。ピン（3-3）と表示範囲の自動調整（3-4）はまだ
+// 出発地を S、訪問先を訪問順の番号でピンにする。表示範囲の自動調整（3-4）はまだ
 const RouteMap = ({ plan }: { plan: Plan }) => {
-  const { lat, lng } = plan.origin.place;
+  const theme = useStore((state) => state.theme);
+  const { origin, visits } = plan;
+  const { lat, lng } = origin.place;
 
   return (
     <div className='h-1/2 flex-none border-b border-gray-200 dark:border-gray-600'>
       {mapsApiKey ? (
         <APIProvider apiKey={mapsApiKey}>
           <GoogleMap
-            // defaultCenter は最初の表示にしか効かないので、出発地が変わったら作り直す
-            key={`${lat},${lng}`}
+            // defaultCenter と colorScheme は最初の表示にしか効かないので、
+            // 出発地かテーマが変わったら作り直す
+            key={`${lat},${lng},${theme}`}
+            mapId={mapId}
+            colorScheme={theme === 'dark' ? ColorScheme.DARK : ColorScheme.LIGHT}
             defaultCenter={{ lat, lng }}
             defaultZoom={15}
             gestureHandling='greedy'
             disableDefaultUI
-          />
+          >
+            <AdvancedMarker position={{ lat, lng }} title={origin.place.name}>
+              <Pin {...ORIGIN_COLOR} glyph='S' glyphColor='#ffffff' />
+            </AdvancedMarker>
+            {visits.map((visit, i) => (
+              <AdvancedMarker
+                key={`${i}-${visit.place.name}`}
+                position={{ lat: visit.place.lat, lng: visit.place.lng }}
+                title={`${i + 1}. ${visit.place.name}`}
+              >
+                <Pin {...VISIT_COLOR} glyph={String(i + 1)} glyphColor='#ffffff' />
+              </AdvancedMarker>
+            ))}
+          </GoogleMap>
         </APIProvider>
       ) : (
         <div className='flex h-full items-center justify-center text-sm text-gray-500 dark:text-gray-400'>
