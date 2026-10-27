@@ -1,6 +1,11 @@
 import React from 'react';
+import { APIProvider, Map as GoogleMap } from '@vis.gl/react-google-maps';
 import useStore from '@store/store';
 import { Plan } from '@type/plan';
+
+// 3-1 で作ったフロント用のキー。ビルド成果物に埋め込まれる前提で、
+// Google Cloud 側でリファラと Maps JavaScript API のみに制限している
+const mapsApiKey: string | undefined = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
 // チャットの右に置くパネル。Week 3 で地図が入る。
 // スマホ（md 未満）では出さない。
@@ -10,6 +15,7 @@ const MapPanel = () => {
 
   return (
     <aside className='hidden md:flex w-[40%] flex-none flex-col h-full border-l border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100'>
+      {plan && <RouteMap plan={plan} />}
       <h2 className='px-5 pt-4 pb-1 text-base font-semibold'>ルート</h2>
       {plan ? (
         <PlanList plan={plan} />
@@ -21,6 +27,32 @@ const MapPanel = () => {
         </div>
       )}
     </aside>
+  );
+};
+
+// 出発地を中心に地図を出す。ピン（3-3）と表示範囲の自動調整（3-4）はまだ
+const RouteMap = ({ plan }: { plan: Plan }) => {
+  const { lat, lng } = plan.origin.place;
+
+  return (
+    <div className='h-1/2 flex-none border-b border-gray-200 dark:border-gray-600'>
+      {mapsApiKey ? (
+        <APIProvider apiKey={mapsApiKey}>
+          <GoogleMap
+            // defaultCenter は最初の表示にしか効かないので、出発地が変わったら作り直す
+            key={`${lat},${lng}`}
+            defaultCenter={{ lat, lng }}
+            defaultZoom={15}
+            gestureHandling='greedy'
+            disableDefaultUI
+          />
+        </APIProvider>
+      ) : (
+        <div className='flex h-full items-center justify-center text-sm text-gray-500 dark:text-gray-400'>
+          地図のキー（VITE_GOOGLE_MAPS_API_KEY）が設定されていません
+        </div>
+      )}
+    </div>
   );
 };
 
