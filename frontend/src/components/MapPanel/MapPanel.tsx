@@ -79,6 +79,7 @@ const RouteMap = ({ plan }: { plan: Plan }) => {
                 <Pin {...VISIT_COLOR} glyph={String(i + 1)} glyphColor='#ffffff' />
               </AdvancedMarker>
             ))}
+            <RouteLine plan={plan} />
             <FitToPlan plan={plan} />
           </GoogleMap>
         </APIProvider>
@@ -113,7 +114,43 @@ const FitToPlan = ({ plan }: { plan: Plan }) => {
   return null;
 };
 
-const formatKm = (distance_m: number) => `${(distance_m / 1000).toFixed(1)} km`;
+// 出発地 → 1 → 2 … を訪問順に直線（点線）で結ぶ。
+// 実際に歩く道の形ではない（道の形はバックエンドが取っていないので v1.1.0 で検討）。
+// @vis.gl 1.6.1 には線の部品がないので、地図に google.maps.Polyline を直接置く
+const RouteLine = ({ plan }: { plan: Plan }) => {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map) return;
+    const path = [plan.origin.place, ...plan.visits.map((v) => v.place)].map(
+      ({ lat, lng }) => ({ lat, lng })
+    );
+    const line = new google.maps.Polyline({
+      map,
+      path,
+      strokeOpacity: 0, // 実線は消し、下の icons で点線を描く
+      icons: [
+        {
+          icon: {
+            path: 'M 0,-1 0,1',
+            strokeColor: VISIT_COLOR.background,
+            strokeOpacity: 0.8,
+            scale: 3,
+          },
+          offset: '0',
+          repeat: '12px',
+        },
+      ],
+      zIndex: 0, // ピンより下に描く
+    });
+    // plan が変わったり地図が作り直されたりしたら、古い線を消す
+    return () => line.setMap(null);
+  }, [map, plan]);
+
+  return null;
+};
+
+const formatKm =(distance_m: number) => `${(distance_m / 1000).toFixed(1)} km`;
 
 const PlanList = ({ plan }: { plan: Plan }) => {
   const { origin, visits } = plan;
