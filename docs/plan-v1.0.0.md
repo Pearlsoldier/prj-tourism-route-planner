@@ -196,6 +196,8 @@ cd backend && pytest -q                          # 退行なし
 | 4-5 | `v1.0.0` タグを打つ | Must |
 | 4-6 | 経路線（polyline）／ピンクリックで詳細 | Should |
 
+**4-6 の途中経過（2026-10-28）**：経路線は「ピンどうしを訪問順に直線（点線）で結ぶ」形で先に入れた（`RouteLine`、フロントのみ・追加課金なし）。実際に歩く道に沿った線は、バックエンドで道の形を取得し `plan` の形（ADR-0001）を変える必要があるため v1.1.0 に送る。ピンクリックで詳細は未着手。
+
 **polyline について**: `get_walking_leg`（tools.py:130-133）の FieldMask が `routes.duration,routes.distanceMeters` だけで、経路の形状を取得していない。線を描くには `routes.polyline.encodedPolyline` を追加し、`legs` に保存する必要がある。変更は数行だが、Routes API の課金ティアが変わらないか事前に確認すること。
 
 **達成条件**
