@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   APIProvider,
   AdvancedMarker,
   ColorScheme,
   Map as GoogleMap,
   Pin,
+  useMap,
 } from '@vis.gl/react-google-maps';
 import useStore from '@store/store';
 import { Plan } from '@type/plan';
@@ -45,7 +46,7 @@ const MapPanel = () => {
   );
 };
 
-// 出発地を S、訪問先を訪問順の番号でピンにする。表示範囲の自動調整（3-4）はまだ
+// 出発地を S、訪問先を訪問順の番号でピンにし、全部のピンが収まる範囲で表示する
 const RouteMap = ({ plan }: { plan: Plan }) => {
   const theme = useStore((state) => state.theme);
   const { origin, visits } = plan;
@@ -78,6 +79,7 @@ const RouteMap = ({ plan }: { plan: Plan }) => {
                 <Pin {...VISIT_COLOR} glyph={String(i + 1)} glyphColor='#ffffff' />
               </AdvancedMarker>
             ))}
+            <FitToPlan plan={plan} />
           </GoogleMap>
         </APIProvider>
       ) : (
@@ -87,6 +89,28 @@ const RouteMap = ({ plan }: { plan: Plan }) => {
       )}
     </div>
   );
+};
+
+// 地図の表示範囲を、出発地と全訪問先が収まるように合わせる。
+// 描画はせず、plan が変わるたびに地図を動かすだけの部品
+const FitToPlan = ({ plan }: { plan: Plan }) => {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map) return;
+    const places = [plan.origin.place, ...plan.visits.map((v) => v.place)];
+    if (places.length === 1) {
+      // 1点だけだと fitBounds は最大まで拡大してしまうので、中心とズームを直接決める
+      map.setCenter(places[0]);
+      map.setZoom(15);
+      return;
+    }
+    const bounds = new google.maps.LatLngBounds();
+    places.forEach(({ lat, lng }) => bounds.extend({ lat, lng }));
+    map.fitBounds(bounds, 48); // 48px の余白を残して、端のピンが切れないようにする
+  }, [map, plan]);
+
+  return null;
 };
 
 const formatKm = (distance_m: number) => `${(distance_m / 1000).toFixed(1)} km`;
