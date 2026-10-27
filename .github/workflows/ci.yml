@@ -1,0 +1,42 @@
+# push のたびに、バックエンドのテストとフロントのビルドが通るかを確かめる。
+# どちらも外部 API を叩かないので、API キーなどの secrets は渡さない。
+name: CI
+
+on:
+  push:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      # ローカルと同じ uv を使う。Python は .python-version（3.13）を uv が読んで入れる
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.18"
+
+      # --locked：uv.lock が pyproject.toml とずれていたら、書き換えずに失敗させる
+      - run: uv sync --locked
+      - run: uv run pytest -q
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
+
+      # --frozen-lockfile：yarn.lock が package.json とずれていたら、書き換えずに失敗させる
+      - run: yarn install --frozen-lockfile
+      - run: yarn build
